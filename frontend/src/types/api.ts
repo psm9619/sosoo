@@ -87,6 +87,42 @@ export interface AnalysisResult {
   progressiveContextNote?: string | null;
   priorityRanking?: PriorityRankingInfo | null;
   moderation?: ModerationInfo | null;
+  // 새로운 카테고리별 상세 피드백 (면접/발표용)
+  categoryFeedback?: CategoryFeedback | null;
+}
+
+// ============================================
+// 카테고리별 상세 피드백 (면접/발표 전용)
+// ============================================
+
+/** 서브 카테고리 평가 */
+export interface SubcategoryEvaluation {
+  name: string;           // 예: "속도", "필러워드"
+  status: 'good' | 'warning' | 'bad';
+  feedback: string;       // 예: "140 WPM, 권장 범위 내"
+  details?: string[];     // 예: ["음 5회", "아니 그러니까 3회"]
+}
+
+/** 메인 카테고리 평가 */
+export interface CategoryEvaluation {
+  level: 'excellent' | 'good' | 'average' | 'needs_improvement';
+  label: string;          // 한글 레이블 (예: "좋음", "보통")
+  highlight: string;      // 카드에 표시할 핵심 포인트
+  subcategories: SubcategoryEvaluation[];
+}
+
+/** 카테고리별 상세 피드백 (4개 카테고리) */
+export interface CategoryFeedback {
+  // 한 줄 평가
+  summary: string;
+
+  // 메인 카테고리별 평가
+  categories: {
+    delivery: CategoryEvaluation;     // 전달력
+    structure: CategoryEvaluation;    // 구조력
+    content: CategoryEvaluation;      // 내용력
+    contextFit: CategoryEvaluation;   // 상황 적합성
+  };
 }
 
 // ============================================

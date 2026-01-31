@@ -16,7 +16,9 @@ import { createAttempt } from '@/lib/supabase/attempts';
 import { analyzeAudio, PROGRESS_MESSAGES, type AnalyzeResult } from '@/lib/api/analyze';
 import { INTERVIEW_CATEGORY_LABELS, type Attempt, type Project, type Question } from '@/types';
 import { BeforeAfterComparison } from '@/components/audio';
+import { CategoryFeedbackView } from '@/components/feedback';
 import { useUserStore } from '@/lib/stores/user-store';
+import type { CategoryFeedback } from '@/types/api';
 
 type Step = 'ready' | 'recording' | 'processing' | 'result';
 
@@ -39,6 +41,7 @@ export default function QuestionRecordingPage() {
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingMessage, setProcessingMessage] = useState('');
   const [currentAttempt, setCurrentAttempt] = useState<Attempt | null>(null);
+  const [categoryFeedback, setCategoryFeedback] = useState<CategoryFeedback | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const {
@@ -230,6 +233,10 @@ export default function QuestionRecordingPage() {
             addLocalAttempt(projectId, questionId, attempt);
 
             setCurrentAttempt(attempt);
+            // 카테고리별 피드백 저장 (면접/발표 프로젝트용)
+            if (result.analysisResult?.categoryFeedback) {
+              setCategoryFeedback(result.analysisResult.categoryFeedback);
+            }
             setStep('result');
           },
           onError: (err) => {
@@ -250,6 +257,7 @@ export default function QuestionRecordingPage() {
     setProcessingProgress(0);
     setProcessingMessage('');
     setCurrentAttempt(null);
+    setCategoryFeedback(null);
     setError(null);
   };
 
@@ -262,6 +270,7 @@ export default function QuestionRecordingPage() {
       setStep('ready');
       setProcessingProgress(0);
       setCurrentAttempt(null);
+      setCategoryFeedback(null);
     } else {
       router.push(`/studio/${projectId}`);
     }
@@ -275,6 +284,7 @@ export default function QuestionRecordingPage() {
     setStep('ready');
     setProcessingProgress(0);
     setCurrentAttempt(null);
+    setCategoryFeedback(null);
   };
 
   // 로딩 상태
@@ -471,13 +481,22 @@ export default function QuestionRecordingPage() {
           {/* Result State */}
           {step === 'result' && currentAttempt && (
             <div className="animate-fade-in">
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-teal text-white flex items-center justify-center">
-                  <span className="text-2xl font-bold">{currentAttempt.score}</span>
+              {/* 면접/발표: 카테고리별 상세 피드백 */}
+              {categoryFeedback && (project?.type === 'interview' || project?.type === 'presentation') ? (
+                <div className="mb-8">
+                  <h2 className="text-2xl font-bold text-charcoal mb-6 text-center">분석 완료!</h2>
+                  <CategoryFeedbackView feedback={categoryFeedback} />
                 </div>
-                <h2 className="text-2xl font-bold text-charcoal mb-1">분석 완료!</h2>
-                <p className="text-gray-warm">이번 연습 점수: {currentAttempt.score}점</p>
-              </div>
+              ) : (
+                /* 자유스피치: 기존 점수 표시 */
+                <div className="text-center mb-8">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-teal text-white flex items-center justify-center">
+                    <span className="text-2xl font-bold">{currentAttempt.score}</span>
+                  </div>
+                  <h2 className="text-2xl font-bold text-charcoal mb-1">분석 완료!</h2>
+                  <p className="text-gray-warm">이번 연습 점수: {currentAttempt.score}점</p>
+                </div>
+              )}
 
               {/* Before/After Comparison */}
               <div className="mb-8">
