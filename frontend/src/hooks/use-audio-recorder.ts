@@ -8,22 +8,32 @@ interface UseAudioRecorderOptions {
   onMaxDurationReached?: () => void;
 }
 
-// 브라우저가 지원하는 오디오 MIME 타입 감지 (Safari 호환성)
+// 브라우저가 지원하는 오디오 MIME 타입 감지 (Safari/모바일 호환성)
 function getSupportedMimeType(): string {
+  // 지원 순서: webm > mp4/m4a > ogg (대부분의 브라우저 커버)
   const types = [
     'audio/webm;codecs=opus',
     'audio/webm',
-    'audio/mp4',
+    'audio/mp4',           // iOS Safari
+    'audio/mp4;codecs=mp4a.40.2', // AAC in MP4
+    'audio/aac',           // 일부 모바일
     'audio/ogg;codecs=opus',
     'audio/ogg',
+    'audio/wav',           // 최후의 fallback
   ];
 
   for (const type of types) {
-    if (MediaRecorder.isTypeSupported(type)) {
-      return type;
+    try {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) {
+        console.log('[AudioRecorder] Using MIME type:', type);
+        return type;
+      }
+    } catch {
+      // isTypeSupported 호출 실패 시 무시
     }
   }
 
+  console.log('[AudioRecorder] No supported MIME type found, using browser default');
   return ''; // 브라우저 기본값 사용
 }
 
@@ -107,7 +117,15 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
 
       mediaRecorder.onstop = () => {
         // MediaRecorder가 사용한 실제 MIME 타입 사용
-        const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
+        const actualMimeType = mediaRecorder.mimeType || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: actualMimeType });
+
+        console.log('[AudioRecorder] Recording stopped:', {
+          mimeType: actualMimeType,
+          chunks: chunksRef.current.length,
+          totalSize: blob.size,
+          sizeKB: (blob.size / 1024).toFixed(2) + ' KB',
+        });
 
         // 현재 녹음 시간 가져오기
         const currentDuration = useRecordingStore.getState().duration;
