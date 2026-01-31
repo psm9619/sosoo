@@ -13,8 +13,8 @@ const features = [
     ),
   },
   {
-    title: 'LLM 발화 분석',
-    description: '대규모 언어 모델이 문장 구조, 명확성, 전달력을 분석합니다.',
+    title: 'AI 발화 분석',
+    description: 'AI가 문장 구조, 말 속도, 필러워드(어, 음...)를 분석하고 구체적인 개선점을 알려드립니다.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-teal">
         <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -35,8 +35,8 @@ const features = [
     ),
   },
   {
-    title: '반복 개선',
-    description: '피드백을 반영해 더 나은 버전으로 계속 다듬을 수 있습니다.',
+    title: '맞춤 재요청',
+    description: '결과가 마음에 들지 않으면 의도를 전달해 최대 3회까지 다시 생성할 수 있습니다.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-teal">
         <path d="M1 4V10H7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -49,18 +49,19 @@ const features = [
 
 const useCases = [
   {
-    title: '면접 연습',
-    description: '자기소개, 질문 답변을 자신감 있게 표현하는 방법을 연습하세요.',
+    title: '면접이 코앞이라면',
+    description: 'D-Day 카운트다운과 함께 핵심 질문에 집중하세요. AI가 매 연습마다 성장을 추적해 자신감을 높여드립니다.',
     emoji: '💼',
+    highlight: true,
   },
   {
-    title: '발표 준비',
-    description: '중요한 프레젠테이션 전, 발표 내용을 더 명확하게 다듬으세요.',
+    title: '중요한 발표가 있다면',
+    description: '프레젠테이션 스크립트를 더 명확하고 설득력 있게 다듬으세요. 이전 연습 기록을 바탕으로 개선점을 제안합니다.',
     emoji: '🎤',
   },
   {
-    title: '자유스피치',
-    description: '일상적인 의견 전달이나 스피치 연습에 활용하세요.',
+    title: '말하기 실력을 키우고 싶다면',
+    description: '일상적인 스피치 연습으로 꾸준히 실력을 쌓으세요. AI가 성장 패턴을 분석해 맞춤 코칭을 제공합니다.',
     emoji: '🎙️',
   },
 ];
@@ -121,10 +122,10 @@ export default function AboutPage() {
             <div className="space-y-8">
               {[
                 { step: '1', title: '음성 녹음', desc: '마이크 버튼을 누르고 개선하고 싶은 내용을 말해주세요. 최대 5분까지 녹음 가능합니다.' },
-                { step: '2', title: '음성 → 텍스트 변환', desc: 'AI가 녹음된 음성을 정확한 텍스트로 변환합니다. 이 과정에서 어조, 속도 등의 특성도 함께 분석됩니다.' },
-                { step: '3', title: '발화 분석 및 개선', desc: '문장 구조, 불필요한 추임새, 반복되는 표현 등을 분석하고 더 명확한 버전을 제안합니다.' },
-                { step: '4', title: '내 목소리로 합성', desc: '개선된 텍스트를 나와 같은 목소리로 합성해 들어볼 수 있습니다. (회원가입 필요)' },
-                { step: '5', title: '피드백 반영', desc: '원하는 부분을 추가로 수정 요청하면, AI가 피드백을 반영해 다시 개선합니다.' },
+                { step: '2', title: '음성 → 텍스트 변환', desc: 'AI가 녹음된 음성을 정확한 텍스트로 변환합니다. 말 속도(WPM)와 어조도 함께 분석됩니다.' },
+                { step: '3', title: '발화 분석 및 개선', desc: '문장 구조, 말 속도, 필러워드(어, 음...) 등을 분석하고 더 명확한 버전을 제안합니다. 개선된 버전을 먼저 보여드려 학습 효과를 높입니다.' },
+                { step: '4', title: '내 목소리로 합성', desc: '개선된 텍스트를 나와 같은 목소리로 합성해 들어볼 수 있습니다. (회원가입 및 본인인증 필요)' },
+                { step: '5', title: '맞춤 재요청', desc: '결과가 마음에 들지 않으면 의도를 전달해 최대 3회까지 다시 생성할 수 있습니다. AI가 이전 피드백을 기억해 점점 더 나은 결과를 제안합니다.' },
               ].map((item, index) => (
                 <div key={index} className="flex gap-6">
                   <div className="flex-shrink-0 w-12 h-12 rounded-full bg-teal text-white font-bold flex items-center justify-center">
@@ -151,8 +152,20 @@ export default function AboutPage() {
             </p>
             <div className="grid md:grid-cols-3 gap-6">
               {useCases.map((useCase, index) => (
-                <Card key={index} className="p-6 bg-cream border-none text-center hover:shadow-lg hover:-translate-y-1 transition-all">
+                <Card
+                  key={index}
+                  className={`p-6 border-none text-center hover:shadow-lg hover:-translate-y-1 transition-all ${
+                    'highlight' in useCase && useCase.highlight
+                      ? 'bg-coral-light/30 border-2 border-coral/20 ring-2 ring-coral/10'
+                      : 'bg-cream'
+                  }`}
+                >
                   <div className="text-4xl mb-4">{useCase.emoji}</div>
+                  {'highlight' in useCase && useCase.highlight && (
+                    <span className="inline-block px-2 py-1 bg-coral text-white text-xs font-medium rounded-full mb-2">
+                      추천
+                    </span>
+                  )}
                   <h3 className="text-lg font-semibold text-charcoal mb-2">
                     {useCase.title}
                   </h3>

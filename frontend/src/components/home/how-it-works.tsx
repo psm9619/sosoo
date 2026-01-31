@@ -6,7 +6,7 @@ const steps = [
   {
     number: '01',
     title: '녹음하기',
-    description: '발표, 자기소개 등 개선하고 싶은 발화를 녹음하세요.',
+    description: '면접 답변, 발표 스크립트 등 개선하고 싶은 발화를 녹음하세요.',
     icon: (
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-teal">
         <path
@@ -23,7 +23,7 @@ const steps = [
   {
     number: '02',
     title: 'AI 분석',
-    description: 'AI가 발화 패턴, 문장 구조, 명확성을 분석하고 개선점을 찾습니다.',
+    description: 'AI가 문장 구조, 말 속도, 필러워드를 분석합니다. 연습할수록 AI가 성장 패턴을 파악해 맞춤 피드백을 제공해요.',
     icon: (
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-teal">
         <path
@@ -52,8 +52,8 @@ const steps = [
   },
   {
     number: '03',
-    title: '내 목소리로 듣기',
-    description: '개선된 발화를 나와 같은 목소리로 들어보며 연습하세요.',
+    title: '개선 버전 먼저 듣기',
+    description: '개선된 발화를 나와 같은 목소리로 먼저 들어보세요. 어떻게 바뀌었는지 바로 확인할 수 있어요.',
     icon: (
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-teal">
         <path

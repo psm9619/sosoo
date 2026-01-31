@@ -18,8 +18,11 @@ export default function PrivacyPage() {
               <ul className="list-disc pl-6 text-gray-warm space-y-2">
                 <li>회원 가입 및 관리: 회원제 서비스 이용에 따른 본인확인, 서비스 부정이용 방지</li>
                 <li>서비스 제공: 음성 녹음 분석 및 개선된 발화 제공, 콘텐츠 제공</li>
-                <li>서비스 개선: AI 모델 학습 및 서비스 품질 향상 (별도 동의 시)</li>
+                <li>서비스 품질 관리: 시스템 안정성 확보 및 오류 대응</li>
               </ul>
+              <p className="text-gray-warm leading-relaxed mt-4 p-3 bg-teal-light/20 rounded-lg border border-teal/20">
+                <strong className="text-charcoal">참고:</strong> 이용자의 음성 데이터는 AI 모델 학습에 절대 사용되지 않습니다.
+              </p>
             </section>
 
             <section className="mb-8">
@@ -64,9 +67,14 @@ export default function PrivacyPage() {
               <p className="text-gray-warm leading-relaxed mb-4">
                 서비스는 개인정보 보유기간의 경과, 처리목적 달성 등 개인정보가 불필요하게 되었을 때에는 지체없이 해당 개인정보를 파기합니다.
               </p>
-              <p className="text-gray-warm leading-relaxed">
+              <p className="text-gray-warm leading-relaxed mb-4">
                 전자적 파일 형태의 정보는 기록을 재생할 수 없는 기술적 방법을 사용하여 삭제하며, 종이에 출력된 개인정보는 분쇄기로 분쇄하거나 소각을 통하여 파기합니다.
               </p>
+              <div className="p-3 bg-teal-light/20 rounded-lg border border-teal/20">
+                <p className="text-sm text-gray-warm">
+                  <strong className="text-charcoal">즉시 삭제:</strong> 이용자가 마이페이지에서 데이터 삭제를 요청하면 화면에서 즉시 삭제되며, 서버에서도 지체 없이 영구 삭제 처리됩니다.
+                </p>
+              </div>
             </section>
 
             <section className="mb-8">

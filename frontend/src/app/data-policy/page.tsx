@@ -77,6 +77,7 @@ export default function DataPolicyPage() {
                         <li>• 음성 파일: <strong className="text-coral">24시간 후 자동 삭제</strong></li>
                         <li>• 분석 결과: <strong className="text-coral">24시간 후 자동 삭제</strong></li>
                         <li>• 세션 데이터: 브라우저 종료 시 삭제</li>
+                        <li>• 보이스 클로닝: <strong className="text-coral">이용 불가</strong></li>
                       </ul>
                     </div>
                   </div>
@@ -93,13 +94,14 @@ export default function DataPolicyPage() {
                       <ul className="text-sm text-gray-warm space-y-1">
                         <li>• 음성 파일: <strong>24시간 후 자동 삭제</strong></li>
                         <li>• 분석 결과 텍스트: <strong className="text-teal">영구 보관</strong> (삭제 요청 시까지)</li>
-                        <li>• 합성 음성: <strong className="text-teal">영구 보관</strong> (삭제 요청 시까지)</li>
+                        <li>• 합성 음성: 기본 남/녀 음성만 이용 가능</li>
+                        <li>• 보이스 클로닝: 본인인증 + 동의 필요</li>
                       </ul>
                     </div>
                   </div>
                 </Card>
 
-                {/* Member with consent */}
+                {/* Member with data retention consent */}
                 <Card className="p-6 bg-teal-light/20 border border-teal/20">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-xl bg-teal-light/50 flex items-center justify-center flex-shrink-0">
@@ -111,11 +113,26 @@ export default function DataPolicyPage() {
                         <li>• 음성 파일: <strong className="text-teal">영구 보관</strong> (삭제 요청 시까지)</li>
                         <li>• 분석 결과 텍스트: <strong className="text-teal">영구 보관</strong></li>
                         <li>• 합성 음성: <strong className="text-teal">영구 보관</strong></li>
-                        <li>• 마이페이지에서 개별 삭제 가능</li>
+                        <li>• 마이페이지에서 개별 삭제 가능 (즉시 처리)</li>
                       </ul>
                     </div>
                   </div>
                 </Card>
+              </div>
+
+              {/* Consent Types Explanation */}
+              <div className="mt-6 p-4 bg-warm-white rounded-lg border border-border">
+                <h4 className="font-medium text-charcoal mb-3 flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 16v-4M12 8h.01" />
+                  </svg>
+                  동의 유형 안내
+                </h4>
+                <ul className="text-sm text-gray-warm space-y-2">
+                  <li><strong className="text-charcoal">데이터 보관 동의:</strong> 연습 기록(음성, 분석 결과)을 영구 보관하여 성장 추이를 확인할 수 있습니다.</li>
+                  <li><strong className="text-charcoal">보이스 클로닝 동의:</strong> 내 목소리로 개선된 발화를 듣기 위한 별도 동의입니다. 회원가입 및 본인인증(이메일) 완료 후 이용 가능합니다.</li>
+                </ul>
               </div>
             </section>
 
@@ -154,7 +171,13 @@ export default function DataPolicyPage() {
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal flex-shrink-0 mt-0.5">
                       <polyline points="20,6 9,17 4,12" />
                     </svg>
-                    <span><strong className="text-charcoal">즉시 삭제 가능:</strong> 마이페이지에서 언제든 음성 모델과 관련 데이터를 완전히 삭제할 수 있습니다.</span>
+                    <span><strong className="text-charcoal">다운로드 불가:</strong> 합성된 음성은 서비스 내에서만 재생 가능하며, 다운로드할 수 없습니다.</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-gray-warm">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal flex-shrink-0 mt-0.5">
+                      <polyline points="20,6 9,17 4,12" />
+                    </svg>
+                    <span><strong className="text-charcoal">즉시 삭제 가능:</strong> 마이페이지에서 언제든 음성 모델과 관련 데이터를 완전히 삭제할 수 있습니다. 삭제 요청 시 즉시 처리됩니다.</span>
                   </li>
                   <li className="flex items-start gap-3 text-gray-warm">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal flex-shrink-0 mt-0.5">
