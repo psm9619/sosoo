@@ -8,9 +8,10 @@ import Anthropic from '@anthropic-ai/sdk';
 // PDF 파일에서 텍스트 추출 (동적 임포트로 서버리스 환경 호환)
 async function parsePdf(buffer: Buffer): Promise<{ text: string }> {
   // pdf-parse를 동적으로 로드하여 analyze 라우트에서 불필요한 로드 방지
-  const pdfParse = (await import('pdf-parse')).default;
-  const data = await pdfParse(buffer);
-  return { text: data.text };
+  const { PDFParse } = await import('pdf-parse');
+  const pdf = new PDFParse({ data: new Uint8Array(buffer) });
+  const result = await pdf.getText();
+  return { text: result.text };
 }
 
 // DOCX 파일에서 텍스트 추출 (동적 임포트)
