@@ -150,6 +150,36 @@ export async function analyzeContext(input: ContextAnalysisInput): Promise<Conte
 // 문서 텍스트 추출
 // ============================================
 
+/**
+ * File 객체에서 텍스트 추출 (FormData에서 업로드된 파일용)
+ * 동적 import를 사용하여 서버리스 환경 호환
+ */
+export async function extractTextFromFile(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  // PDF 파일
+  if (file.type === 'application/pdf') {
+    const pdfData = await parsePdf(buffer);
+    return pdfData.text;
+  }
+
+  // DOCX 파일
+  if (
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    file.type === 'application/msword'
+  ) {
+    return parseDocx(buffer);
+  }
+
+  // 텍스트 파일
+  if (file.type === 'text/plain' || file.type === 'text/markdown') {
+    return new TextDecoder().decode(buffer);
+  }
+
+  throw new Error(`${file.type} 파일 형식은 지원되지 않습니다. PDF, DOCX, 또는 텍스트 파일을 업로드해주세요.`);
+}
+
 export async function extractTextFromDocument(
   fileUrl: string,
   fileType: string

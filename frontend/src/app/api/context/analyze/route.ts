@@ -10,17 +10,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { analyzeContext, extractTextFromDocument } from '@/lib/ai/nodes';
+import { analyzeContext, extractTextFromDocument, extractTextFromFile } from '@/lib/ai/nodes';
 import type { ContextAnalysisInput } from '@/lib/ai/nodes';
-import * as mammoth from 'mammoth';
-import { PDFParse } from 'pdf-parse';
-
-// PDF 파일에서 텍스트 추출
-async function parsePdf(buffer: Buffer): Promise<{ text: string }> {
-  const pdf = new PDFParse({ data: new Uint8Array(buffer) });
-  const result = await pdf.getText();
-  return { text: result.text };
-}
 
 interface AnalyzeRequest {
   documentText?: string;
@@ -30,34 +21,6 @@ interface AnalyzeRequest {
   projectType: 'interview' | 'presentation' | 'free_speech';
   company?: string;
   position?: string;
-}
-
-// 파일에서 텍스트 추출 (브라우저에서 업로드된 파일)
-async function extractTextFromFile(file: File): Promise<string> {
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-
-  // PDF 파일
-  if (file.type === 'application/pdf') {
-    const pdfData = await parsePdf(buffer);
-    return pdfData.text;
-  }
-
-  // DOCX 파일
-  if (
-    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-    file.type === 'application/msword'
-  ) {
-    const result = await mammoth.extractRawText({ buffer });
-    return result.value;
-  }
-
-  // 텍스트 파일
-  if (file.type === 'text/plain' || file.type === 'text/markdown') {
-    return new TextDecoder().decode(buffer);
-  }
-
-  throw new Error(`${file.type} 파일 형식은 지원되지 않습니다. PDF, DOCX, 또는 텍스트 파일을 업로드해주세요.`);
 }
 
 export async function POST(request: NextRequest) {

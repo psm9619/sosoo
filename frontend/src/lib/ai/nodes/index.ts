@@ -4,7 +4,7 @@ export { improvementNode, reflectionNode, refinementNode, generateImprovedScript
 export { ttsNode, refinementTtsNode, textToSpeech, uploadAudioToStorage } from './tts';
 
 // Context & Question Generation
-export { analyzeContext, extractTextFromDocument } from './context';
+export { analyzeContext, extractTextFromDocument, extractTextFromFile } from './context';
 export type { ContextAnalysisInput, ContextAnalysisResult, Experience } from './context';
 
 export { generateQuestions, generatePresentationQuestions, DEFAULT_QUESTIONS_PER_CATEGORY } from './questions';
