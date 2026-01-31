@@ -195,18 +195,11 @@ export function Header() {
             </div>
           ) : (
             // 비로그인 상태
-            <>
-              <Link href="/studio">
-                <Button variant="ghost" size="sm" className="text-gray-warm hover:text-charcoal">
-                  체험하기
-                </Button>
-              </Link>
-              <Link href="/login">
-                <Button size="sm" className="bg-teal hover:bg-teal-dark text-white">
-                  시작하기
-                </Button>
-              </Link>
-            </>
+            <Link href="/login">
+              <Button size="sm" className="bg-teal hover:bg-teal-dark text-white">
+                로그인
+              </Button>
+            </Link>
           )}
         </div>
       </div>
