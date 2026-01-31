@@ -56,14 +56,14 @@ export default function StudioPage() {
   return (
     <div className="min-h-screen flex flex-col bg-cream">
       <Header />
-      <main className="flex-1 pt-16 px-6 py-12">
+      <main className="flex-1 pt-16 px-4 sm:px-6 py-8 sm:py-12">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-3xl md:text-4xl font-bold text-charcoal mb-4">
+          <div className="text-center mb-8 sm:mb-12">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-charcoal mb-3 sm:mb-4">
               발화 코칭 <span className="text-teal">스튜디오</span>
             </h1>
-            <p className="text-gray-warm">
+            <p className="text-sm sm:text-base text-gray-warm">
               면접, 발표, 자유 스피치 연습을 시작해보세요.
             </p>
           </div>
@@ -75,25 +75,24 @@ export default function StudioPage() {
               <div className="absolute -right-8 -top-8 w-32 h-32 bg-teal/5 rounded-full" />
               <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-purple-500/5 rounded-full" />
 
-              <div className="relative flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center flex-shrink-0 shadow-lg">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-white">
+              <div className="relative flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center flex-shrink-0 shadow-lg">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-white">
                     <path d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z" fill="currentColor" />
                     <path d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z" fill="currentColor" />
                   </svg>
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
                     <span className="text-xs px-2 py-0.5 bg-teal/10 text-teal rounded-full font-medium">NEW</span>
-                    <h3 className="font-bold text-charcoal">나의 목소리로 피드백 듣기</h3>
+                    <h3 className="font-bold text-charcoal text-sm sm:text-base">나의 목소리로 피드백 듣기</h3>
                   </div>
                   <p className="text-sm text-gray-warm">
-                    AI가 개선한 스피치를 <strong className="text-teal">내 목소리</strong>로 들어보세요!
-                    30초 샘플만 녹음하면 됩니다.
+                    AI가 개선한 스피치를 <strong className="text-teal">내 목소리</strong>로 들어보세요! 30초 샘플만 녹음하면 됩니다.
                   </p>
                 </div>
-                <Link href="/my?tab=settings">
-                  <Button className="bg-teal hover:bg-teal-dark whitespace-nowrap shadow-lg shadow-teal/20">
+                <Link href="/my?tab=settings" className="flex-shrink-0">
+                  <Button className="bg-teal hover:bg-teal-dark whitespace-nowrap shadow-lg shadow-teal/20 w-full sm:w-auto">
                     🎤 음성 등록하기
                   </Button>
                 </Link>

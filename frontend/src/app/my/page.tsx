@@ -222,37 +222,39 @@ function MyPageContent() {
       <Header />
       <main className="flex-1 pt-16">
         {/* Profile Header */}
-        <section className="py-12 px-6 bg-warm-white border-b border-border">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center text-white text-2xl font-bold">
-                {user?.email?.charAt(0).toUpperCase() || 'U'}
+        <section className="py-8 sm:py-12 px-4 sm:px-6 bg-warm-white border-b border-border">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-4 sm:gap-6">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center text-white text-xl sm:text-2xl font-bold flex-shrink-0">
+                  {user?.email?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-xl sm:text-2xl font-bold text-charcoal truncate">
+                    {user?.user_metadata?.full_name || user?.email?.split('@')[0] || '사용자'}님
+                  </h1>
+                  <p className="text-gray-warm text-sm sm:text-base truncate">{user?.email || 'user@example.com'}</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-charcoal">
-                  {user?.user_metadata?.full_name || user?.email?.split('@')[0] || '사용자'}님
-                </h1>
-                <p className="text-gray-warm">{user?.email || 'user@example.com'}</p>
-              </div>
+              {isAdmin && (
+                <Link href="/admin" className="flex-shrink-0">
+                  <Button variant="outline" className="gap-2 w-full sm:w-auto justify-center">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 4.5v15m7.5-7.5h-15" />
+                      <circle cx="12" cy="12" r="10" />
+                    </svg>
+                    관리자 대시보드
+                  </Button>
+                </Link>
+              )}
             </div>
-            {isAdmin && (
-              <Link href="/admin">
-                <Button variant="outline" className="gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 4.5v15m7.5-7.5h-15" />
-                    <circle cx="12" cy="12" r="10" />
-                  </svg>
-                  관리자 대시보드
-                </Button>
-              </Link>
-            )}
           </div>
         </section>
 
         {/* Tabs */}
         <section className="border-b border-border bg-warm-white">
-          <div className="max-w-4xl mx-auto px-6">
-            <div className="flex gap-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6">
+            <div className="flex gap-6 sm:gap-8">
               <button
                 onClick={() => setActiveTab('projects')}
                 className={`py-4 border-b-2 font-medium transition-colors ${
@@ -278,17 +280,17 @@ function MyPageContent() {
         </section>
 
         {/* Content */}
-        <section className="py-8 px-6">
+        <section className="py-6 sm:py-8 px-4 sm:px-6">
           <div className="max-w-4xl mx-auto">
             {activeTab === 'projects' && (
               <div className="space-y-4">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold text-charcoal">
+                <div className="flex items-center justify-between gap-4 mb-6">
+                  <h2 className="text-base sm:text-lg font-semibold text-charcoal">
                     총 {projects.length}개의 프로젝트
                   </h2>
                   <Link href="/studio/new?type=interview">
-                    <Button className="bg-teal hover:bg-teal-dark">
+                    <Button className="bg-teal hover:bg-teal-dark text-sm sm:text-base">
                       새 프로젝트
                     </Button>
                   </Link>
@@ -310,12 +312,13 @@ function MyPageContent() {
                       return (
                         <Card
                           key={project.id}
-                          className="p-6 bg-warm-white border-none hover:shadow-md transition-shadow"
+                          className="p-4 sm:p-6 bg-warm-white border-none hover:shadow-md transition-shadow"
                         >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-4">
+                          <div className="space-y-4">
+                            {/* 프로젝트 정보 */}
+                            <div className="flex items-start gap-3 sm:gap-4">
                               <div
-                                className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
                                   isInterview
                                     ? 'bg-teal-light/50'
                                     : project.type === 'presentation'
@@ -323,7 +326,7 @@ function MyPageContent() {
                                     : 'bg-secondary'
                                 }`}
                               >
-                                <span className="text-xl">
+                                <span className="text-lg sm:text-xl">
                                   {isInterview
                                     ? '💼'
                                     : project.type === 'presentation'
@@ -331,13 +334,13 @@ function MyPageContent() {
                                     : '🎙️'}
                                 </span>
                               </div>
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h3 className="font-semibold text-charcoal">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                  <h3 className="font-semibold text-charcoal text-sm sm:text-base">
                                     {project.title}
                                   </h3>
                                   <span
-                                    className={`px-2 py-0.5 text-xs rounded-full ${
+                                    className={`px-2 py-0.5 text-xs rounded-full flex-shrink-0 ${
                                       isInterview
                                         ? 'bg-teal-light/50 text-teal-dark'
                                         : project.type === 'presentation'
@@ -353,15 +356,15 @@ function MyPageContent() {
                                   </span>
                                 </div>
                                 {project.company && (
-                                  <p className="text-sm text-gray-warm mb-2">
+                                  <p className="text-sm text-gray-warm mb-2 truncate">
                                     {project.company} · {project.position}
                                   </p>
                                 )}
-                                <div className="flex items-center gap-4 text-sm text-gray-warm">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-gray-warm">
                                   <span>질문 {project.questions.length}개</span>
-                                  <span>·</span>
+                                  <span className="hidden sm:inline">·</span>
                                   <span>연습 {totalAttempts}회</span>
-                                  <span>·</span>
+                                  <span className="hidden sm:inline">·</span>
                                   <span>
                                     진행률 {questionsWithAttempts}/{project.questions.length}
                                   </span>
@@ -371,16 +374,17 @@ function MyPageContent() {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Link href={`/my/projects/${project.id}`}>
-                                <Button variant="outline" size="sm">
+                            {/* 액션 버튼 */}
+                            <div className="flex items-center gap-2 pt-2 border-t border-border sm:border-0 sm:pt-0 sm:justify-end">
+                              <Link href={`/my/projects/${project.id}`} className="flex-1 sm:flex-none">
+                                <Button variant="outline" size="sm" className="w-full sm:w-auto">
                                   기록 보기
                                 </Button>
                               </Link>
-                              <Link href={`/studio/${project.id}`}>
+                              <Link href={`/studio/${project.id}`} className="flex-1 sm:flex-none">
                                 <Button
                                   size="sm"
-                                  className="bg-teal hover:bg-teal-dark"
+                                  className="bg-teal hover:bg-teal-dark w-full sm:w-auto"
                                 >
                                   연습하기
                                 </Button>
@@ -388,7 +392,7 @@ function MyPageContent() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-gray-soft hover:text-destructive"
+                                className="text-gray-soft hover:text-destructive flex-shrink-0"
                                 onClick={() => handleDeleteProject(project.id)}
                               >
                                 <svg
