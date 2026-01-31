@@ -9,15 +9,29 @@ import type {
   ShortTermMemory,
   ProgressiveContext,
 } from './nodes/progressive-context';
+import type {
+  SituationContext,
+  CategoryWeight,
+  WeightedCategoryScore,
+  PriorityRankingResult,
+} from './tools/priority-tools';
 
 // Re-export Progressive Context types for convenience
 export type { LongTermMemory, ShortTermMemory, ProgressiveContext };
+
+// Re-export Priority Ranking types for convenience
+export type { SituationContext, CategoryWeight, WeightedCategoryScore, PriorityRankingResult };
+
+import type { ProjectType } from '@/types/project';
 
 // ============================================
 // 분석 모드
 // ============================================
 export type AnalysisMode = 'quick' | 'deep';
 export type VoiceType = 'default_male' | 'default_female' | 'cloned';
+
+// ProjectType은 types/project.ts에서 정의됨
+export type { ProjectType };
 
 // ============================================
 // 모더레이션 플래그
@@ -59,6 +73,7 @@ export interface SpeechCoachState {
   audioDuration?: number;
   question?: string;
   projectId?: string;
+  projectType?: ProjectType;
 
   // STT 결과
   transcript?: string;
@@ -106,6 +121,9 @@ export interface SpeechCoachState {
     code: string;
     message: string;
   };
+
+  // Priority Ranking System
+  priorityRankingResult?: PriorityRankingResult;
 }
 
 // ============================================
@@ -118,6 +136,7 @@ export function createInitialState(params: {
   voiceType?: VoiceType;
   question?: string;
   projectId?: string;
+  projectType?: ProjectType;
   userId?: string;
   voiceCloneId?: string;
   progressiveContext?: ProgressiveContext;
@@ -129,6 +148,7 @@ export function createInitialState(params: {
     voiceType: params.voiceType || 'default_male',
     question: params.question,
     projectId: params.projectId,
+    projectType: params.projectType,
     userId: params.userId,
     voiceCloneId: params.voiceCloneId,
     progressiveContext: params.progressiveContext,

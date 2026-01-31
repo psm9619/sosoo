@@ -5,10 +5,13 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { SpeechCoachState } from '../state';
-import type { AnalysisResult, ScoreCard, AnalysisMetrics, ImprovementSuggestion } from '@/types/api';
+import type { ProjectType } from '@/types/project';
+import type { AnalysisResult, ScoreCard, AnalysisMetrics, ImprovementSuggestion, PriorityRankingInfo } from '@/types/api';
 import { analyzePace } from '../tools/pace-analysis';
 import { analyzeFillers } from '../tools/filler-analysis';
 import { analyzeStructure } from '../tools/structure-analysis';
+import { analyzeAllCategories, getCategorySummary } from '../tools/category-analyzer';
+import { analyzePriority, getCategoryNameKo, getSituationLabel, isEqualWeight } from '../tools/priority-tools';
 import { ANALYSIS_SYSTEM_PROMPT, buildAnalysisPrompt } from '../prompts';
 
 // Lazy-loaded Anthropic client
@@ -39,7 +42,12 @@ const GRADE_MAP: Record<string, number> = {
 export async function analyzeContent(
   transcript: string,
   duration: number,
-  userPatterns?: SpeechCoachState['userPatterns']
+  userPatterns?: SpeechCoachState['userPatterns'],
+  options?: {
+    projectType?: ProjectType;
+    question?: string;
+    progressiveContext?: SpeechCoachState['progressiveContext'];
+  }
 ): Promise<AnalysisResult> {
   // 1. 도구 실행 (병렬)
   const [paceResult, fillerResult, structureResult] = await Promise.all([
@@ -48,10 +56,43 @@ export async function analyzeContent(
     Promise.resolve(analyzeStructure(transcript)),
   ]);
 
+  // 1.5 자유스피치: 4가지 카테고리 분석 + 우선순위 랭킹
+  let priorityRanking: PriorityRankingInfo | null = null;
+
+  if (options?.projectType === 'free_speech') {
+    const categoryResults = analyzeAllCategories(transcript, duration);
+    const priorityResult = analyzePriority(transcript, categoryResults, {
+      question: options.question,
+      projectType: 'free_speech',
+    });
+
+    const situationLabelInfo = getSituationLabel(priorityResult.situation.situationType);
+    const equalWeight = isEqualWeight(priorityResult.situation.situationType);
+
+    priorityRanking = {
+      situationType: priorityResult.situation.situationType,
+      situationLabel: situationLabelInfo.label,
+      situationDescription: priorityResult.situation.reasoning,
+      isEqualWeight: equalWeight,
+      focusMessage: priorityResult.focusMessage,
+      weightedScores: priorityResult.weightedScores.map((s) => ({
+        category: getCategoryNameKo(s.category),
+        rawScore: s.rawScore,
+        weight: s.weight,
+        weightedScore: s.weightedScore,
+        issues: s.issues,
+        strengths: s.strengths,
+      })),
+      totalWeightedScore: priorityResult.totalWeightedScore,
+      priorityFeedbackOrder: priorityResult.priorityFeedbackOrder.map(getCategoryNameKo),
+    };
+  }
+
   // 2. 프롬프트 구성
   const prompt = buildAnalysisPrompt({
     transcript,
     duration,
+    question: options?.question,
     paceResult: {
       wordsPerMinute: paceResult.wordsPerMinute,
       assessment: paceResult.assessment,
@@ -68,6 +109,9 @@ export async function analyzeContent(
       assessment: structureResult.assessment,
       recommendation: structureResult.recommendation,
     },
+    // Progressive Context (새로운 메모리 시스템)
+    progressiveContext: options?.progressiveContext,
+    // Legacy userPatterns (이전 버전 호환)
     userPatterns: userPatterns
       ? {
           recurringIssues: userPatterns.recurringIssues,
@@ -87,7 +131,7 @@ export async function analyzeContent(
 
   // 4. 응답 파싱
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
-  const analysisResult = parseAnalysisResponse(text, paceResult, fillerResult, structureResult);
+  const analysisResult = parseAnalysisResponse(text, paceResult, fillerResult, structureResult, priorityRanking);
 
   // 5. Progressive Context 노트 추가
   if (userPatterns && userPatterns.sessionCount > 0) {
@@ -104,7 +148,8 @@ function parseAnalysisResponse(
   text: string,
   paceResult: ReturnType<typeof analyzePace>,
   fillerResult: ReturnType<typeof analyzeFillers>,
-  structureResult: ReturnType<typeof analyzeStructure>
+  structureResult: ReturnType<typeof analyzeStructure>,
+  priorityRanking?: PriorityRankingInfo | null
 ): AnalysisResult {
   // JSON 추출 시도
   const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -190,6 +235,7 @@ function parseAnalysisResponse(
     metrics,
     suggestions,
     structureAnalysis,
+    priorityRanking: priorityRanking || null,
   };
 }
 
@@ -236,7 +282,12 @@ export async function analysisNode(state: SpeechCoachState): Promise<Partial<Spe
     const analysisResult = await analyzeContent(
       state.transcript,
       state.audioDuration,
-      state.userPatterns
+      state.userPatterns,
+      {
+        projectType: state.projectType,
+        question: state.question,
+        progressiveContext: state.progressiveContext,
+      }
     );
 
     return {

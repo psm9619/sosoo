@@ -4,7 +4,7 @@
  */
 
 import { StateGraph, END, Annotation } from '@langchain/langgraph';
-import type { AnalysisMode, VoiceType, ModerationFlags, UserPatterns, PreviousSession } from '../state';
+import type { AnalysisMode, VoiceType, ProjectType, ModerationFlags, UserPatterns, PreviousSession, ProgressiveContext } from '../state';
 import type { AnalysisResult } from '@/types/api';
 import { sttNode } from '../nodes/stt';
 import { analysisNode } from '../nodes/analysis';
@@ -23,6 +23,7 @@ const SpeechCoachAnnotation = Annotation.Root({
   audioDuration: Annotation<number | undefined>({ reducer: (a, b) => b ?? a }),
   question: Annotation<string | undefined>({ reducer: (a, b) => b ?? a }),
   projectId: Annotation<string | undefined>({ reducer: (a, b) => b ?? a }),
+  projectType: Annotation<ProjectType | undefined>({ reducer: (a, b) => b ?? a }),
 
   // STT 결과
   transcript: Annotation<string | undefined>({ reducer: (a, b) => b ?? a }),
@@ -38,7 +39,10 @@ const SpeechCoachAnnotation = Annotation.Root({
   // TTS 결과
   improvedAudioUrl: Annotation<string | undefined>({ reducer: (a, b) => b ?? a }),
 
-  // Progressive Context
+  // Progressive Context (새로운 메모리 시스템)
+  progressiveContext: Annotation<ProgressiveContext | undefined>({ reducer: (a, b) => b ?? a }),
+
+  // Legacy Progressive Context (이전 버전 호환)
   previousSessions: Annotation<PreviousSession[] | undefined>({ reducer: (a, b) => b ?? a }),
   userPatterns: Annotation<UserPatterns | undefined>({ reducer: (a, b) => b ?? a }),
   contextDocuments: Annotation<string[] | undefined>({ reducer: (a, b) => b ?? a }),
@@ -70,21 +74,21 @@ type SpeechCoachState = typeof SpeechCoachAnnotation.State;
 /**
  * 조건부 라우팅: 에러 체크
  */
-function routeAfterStt(state: SpeechCoachState): 'error' | 'analysis' {
-  return state.error ? 'error' : 'analysis';
+function routeAfterStt(state: SpeechCoachState): 'handleError' | 'analysis' {
+  return state.error ? 'handleError' : 'analysis';
 }
 
-function routeAfterAnalysis(state: SpeechCoachState): 'error' | 'improvement' {
-  return state.error ? 'error' : 'improvement';
+function routeAfterAnalysis(state: SpeechCoachState): 'handleError' | 'improvement' {
+  return state.error ? 'handleError' : 'improvement';
 }
 
-function routeAfterImprovement(state: SpeechCoachState): 'error' | 'reflection' | 'skipReflection' {
-  if (state.error) return 'error';
+function routeAfterImprovement(state: SpeechCoachState): 'handleError' | 'reflection' | 'skipReflection' {
+  if (state.error) return 'handleError';
   return state.mode === 'deep' ? 'reflection' : 'skipReflection';
 }
 
-function routeAfterTts(state: SpeechCoachState): '__end__' | 'error' {
-  return state.error ? 'error' : '__end__';
+function routeAfterTts(state: SpeechCoachState): '__end__' | 'handleError' {
+  return state.error ? 'handleError' : '__end__';
 }
 
 /**
@@ -119,7 +123,7 @@ export function createSpeechCoachGraph() {
     .addNode('reflection', reflectionNode)
     .addNode('skipReflection', skipReflectionNode)
     .addNode('tts', ttsNode)
-    .addNode('error', errorNode)
+    .addNode('handleError', errorNode)
     .addEdge('__start__', 'stt')
     .addConditionalEdges('stt', routeAfterStt)
     .addConditionalEdges('analysis', routeAfterAnalysis)
@@ -127,7 +131,7 @@ export function createSpeechCoachGraph() {
     .addEdge('reflection', 'tts')
     .addEdge('skipReflection', 'tts')
     .addConditionalEdges('tts', routeAfterTts)
-    .addEdge('error', '__end__');
+    .addEdge('handleError', '__end__');
 
   return workflow.compile();
 }
@@ -152,8 +156,10 @@ export async function runSpeechCoachWorkflow(params: {
   voiceType?: VoiceType;
   question?: string;
   projectId?: string;
+  projectType?: ProjectType;
   userId?: string;
   voiceCloneId?: string;
+  progressiveContext?: ProgressiveContext;
 }): Promise<SpeechCoachState> {
   const graph = getSpeechCoachGraph();
 
@@ -164,8 +170,10 @@ export async function runSpeechCoachWorkflow(params: {
     voiceType: params.voiceType || 'default_male',
     question: params.question,
     projectId: params.projectId,
+    projectType: params.projectType,
     userId: params.userId,
     voiceCloneId: params.voiceCloneId,
+    progressiveContext: params.progressiveContext,
     refinementCount: 0,
     messages: [],
   };
@@ -184,8 +192,10 @@ export async function* streamSpeechCoachWorkflow(params: {
   voiceType?: VoiceType;
   question?: string;
   projectId?: string;
+  projectType?: ProjectType;
   userId?: string;
   voiceCloneId?: string;
+  progressiveContext?: ProgressiveContext;
 }): AsyncGenerator<{
   event: 'progress' | 'complete' | 'error';
   data: Partial<SpeechCoachState>;
@@ -199,8 +209,10 @@ export async function* streamSpeechCoachWorkflow(params: {
     voiceType: params.voiceType || 'default_male',
     question: params.question,
     projectId: params.projectId,
+    projectType: params.projectType,
     userId: params.userId,
     voiceCloneId: params.voiceCloneId,
+    progressiveContext: params.progressiveContext,
     refinementCount: 0,
     messages: [],
   };

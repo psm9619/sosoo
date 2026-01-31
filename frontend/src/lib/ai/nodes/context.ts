@@ -4,6 +4,15 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import * as mammoth from 'mammoth';
+import { PDFParse } from 'pdf-parse';
+
+// PDF 파일에서 텍스트 추출
+async function parsePdf(buffer: Buffer): Promise<{ text: string }> {
+  const pdf = new PDFParse({ data: new Uint8Array(buffer) });
+  const result = await pdf.getText();
+  return { text: result.text };
+}
 
 // Lazy-loaded Anthropic client
 let anthropicInstance: Anthropic | null = null;
@@ -131,17 +140,13 @@ export async function analyzeContext(input: ContextAnalysisInput): Promise<Conte
 }
 
 // ============================================
-// 문서 텍스트 추출 (간단 버전)
+// 문서 텍스트 추출
 // ============================================
-// 실제로는 PDF/DOCX 파서 필요 - 여기서는 플레이스홀더
 
 export async function extractTextFromDocument(
   fileUrl: string,
   fileType: string
 ): Promise<string> {
-  // TODO: 실제 구현 시 pdf-parse, mammoth 등 사용
-  // 현재는 파일 URL에서 텍스트를 가져오는 것으로 가정
-
   const response = await fetch(fileUrl);
   if (!response.ok) {
     throw new Error(`문서 다운로드 실패: ${response.status}`);
@@ -152,7 +157,24 @@ export async function extractTextFromDocument(
     return response.text();
   }
 
-  // PDF/DOCX는 별도 처리 필요
-  // 임시로 에러 반환
-  throw new Error(`${fileType} 파일 형식은 아직 지원되지 않습니다. 텍스트 파일을 업로드해주세요.`);
+  // PDF 파일 처리
+  if (fileType === 'application/pdf') {
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const pdfData = await parsePdf(buffer);
+    return pdfData.text;
+  }
+
+  // DOCX 파일 처리
+  if (
+    fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    fileType === 'application/msword'
+  ) {
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value;
+  }
+
+  throw new Error(`${fileType} 파일 형식은 지원되지 않습니다. PDF, DOCX, 또는 텍스트 파일을 업로드해주세요.`);
 }

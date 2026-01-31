@@ -21,12 +21,19 @@ function getAnthropic(): Anthropic {
 
 /**
  * 개선된 스크립트 생성
+ * @throws Error if content is insufficient
  */
 export async function generateImprovedScript(
   transcript: string,
   suggestions: Array<{ category: string; suggestion: string }>,
   question?: string
 ): Promise<string> {
+  // 최소 단어 수 체크 (너무 짧은 답변 거부)
+  const wordCount = transcript.trim().split(/\s+/).length;
+  if (wordCount < 5) {
+    throw new Error('INSUFFICIENT_CONTENT: 답변이 너무 짧습니다. 5단어 이상으로 말씀해주세요.');
+  }
+
   const prompt = buildImprovementPrompt({
     transcript,
     suggestions,
@@ -41,6 +48,13 @@ export async function generateImprovedScript(
   });
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
+
+  // AI가 에러 JSON을 반환한 경우 체크
+  if (text.includes('"error"') && text.includes('INSUFFICIENT_CONTENT')) {
+    const errorMatch = text.match(/"message"\s*:\s*"([^"]+)"/);
+    const errorMessage = errorMatch?.[1] || '답변 내용이 부족하여 개선안을 생성할 수 없습니다.';
+    throw new Error(`INSUFFICIENT_CONTENT: ${errorMessage}`);
+  }
 
   // 앞뒤 불필요한 텍스트 제거
   return cleanScript(text);

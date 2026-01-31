@@ -34,6 +34,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
+  const stopResolverRef = useRef<((blob: Blob) => void) | null>(null);
 
   const {
     isRecording,
@@ -107,13 +108,24 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       mediaRecorder.onstop = () => {
         // MediaRecorder가 사용한 실제 MIME 타입 사용
         const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
-        setStopRecording(blob);
+
+        // 현재 녹음 시간 가져오기
+        const currentDuration = useRecordingStore.getState().duration;
+
+        // WebM duration 메타데이터 수정 포함하여 저장
+        setStopRecording(blob, currentDuration);
         stopTimer();
 
         // 스트림 정리
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
+        }
+
+        // Promise resolver 호출 (stop()에서 대기 중인 경우)
+        if (stopResolverRef.current) {
+          stopResolverRef.current(blob);
+          stopResolverRef.current = null;
         }
       };
 
@@ -127,11 +139,16 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
     }
   }, [setStartRecording, setStopRecording, startTimer, stopTimer]);
 
-  // 녹음 정지
-  const stop = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
+  // 녹음 정지 - Promise를 반환하여 blob이 준비될 때까지 대기 가능
+  const stop = useCallback((): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        stopResolverRef.current = resolve;
+        mediaRecorderRef.current.stop();
+      } else {
+        resolve(null);
+      }
+    });
   }, []);
 
   // 녹음 일시정지

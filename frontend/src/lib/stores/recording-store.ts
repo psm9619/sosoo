@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import fixWebmDuration from 'fix-webm-duration';
 
 interface RecordingStore {
   // 녹음 상태
@@ -14,7 +15,7 @@ interface RecordingStore {
 
   // Actions
   startRecording: () => void;
-  stopRecording: (blob: Blob) => void;
+  stopRecording: (blob: Blob, duration: number) => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
   setDuration: (duration: number) => void;
@@ -34,9 +35,23 @@ export const useRecordingStore = create<RecordingStore>((set, get) => ({
 
   startRecording: () => set({ isRecording: true, isPaused: false, duration: 0 }),
 
-  stopRecording: (blob) => {
-    const url = URL.createObjectURL(blob);
-    set({ isRecording: false, isPaused: false, audioBlob: blob, audioUrl: url });
+  stopRecording: async (blob, duration) => {
+    // WebM duration 메타데이터 수정
+    const durationMs = duration * 1000;
+    let fixedBlob = blob;
+
+    try {
+      // webm 포맷인 경우에만 duration fix 적용
+      if (blob.type.includes('webm')) {
+        fixedBlob = await fixWebmDuration(blob, durationMs);
+      }
+    } catch (err) {
+      console.warn('Failed to fix webm duration:', err);
+      // 실패해도 원본 blob 사용
+    }
+
+    const url = URL.createObjectURL(fixedBlob);
+    set({ isRecording: false, isPaused: false, audioBlob: fixedBlob, audioUrl: url });
   },
 
   pauseRecording: () => set({ isPaused: true }),

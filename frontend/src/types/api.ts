@@ -49,6 +49,28 @@ export interface ImprovementSuggestion {
   impact: string;
 }
 
+/** 우선순위 랭킹 - 카테고리별 점수 */
+export interface CategoryScoreResult {
+  category: string;
+  rawScore: number;
+  weight: number;
+  weightedScore: number;
+  issues: string[];
+  strengths: string[];
+}
+
+/** 우선순위 랭킹 결과 (자유스피치용) */
+export interface PriorityRankingInfo {
+  situationType: string;
+  situationLabel: string;           // 한글 레이블 (예: "전문 주제", "경험 공유")
+  situationDescription: string;     // 분류 근거 설명
+  isEqualWeight: boolean;           // 균등 가중치 여부
+  focusMessage: string;
+  weightedScores: CategoryScoreResult[];
+  totalWeightedScore: number;
+  priorityFeedbackOrder: string[];
+}
+
 /** AI 분석 결과 전체 */
 export interface AnalysisResult {
   scores: ScoreCard;
@@ -56,14 +78,20 @@ export interface AnalysisResult {
   suggestions: ImprovementSuggestion[];
   structureAnalysis?: string | null;
   progressiveContextNote?: string | null;
+  priorityRanking?: PriorityRankingInfo | null;
 }
 
 // ============================================
 // Request Types
 // ============================================
 
+import type { ProjectType } from './project';
+
 export type AnalysisMode = 'quick' | 'deep';
 export type VoiceType = 'default_male' | 'default_female' | 'cloned';
+
+// ProjectType은 project.ts에서 정의됨 - 여기서 재export
+export type { ProjectType };
 
 /** 스피치 분석 요청 */
 export interface AnalyzeRequest {
@@ -72,6 +100,8 @@ export interface AnalyzeRequest {
   mode?: AnalysisMode;
   voiceType?: VoiceType;
   question?: string | null;
+  projectType?: ProjectType;
+  userId?: string | null; // Progressive Context용 사용자 ID
 }
 
 /** 재요청 단계 (1=프리뷰, 2=최종) */
