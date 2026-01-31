@@ -47,15 +47,8 @@ function LoginContent() {
     }
   };
 
-  const handleKakaoLogin = async () => {
-    setError(null);
-    setIsLoading(true);
-    try {
-      await signInWithOAuth('kakao');
-    } catch (err) {
-      setError('카카오 로그인 중 오류가 발생했습니다.');
-      setIsLoading(false);
-    }
+  const handleKakaoLogin = () => {
+    alert('카카오 로그인은 준비 중입니다.\nGoogle로 가입해주세요!');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
