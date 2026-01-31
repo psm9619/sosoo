@@ -13,6 +13,7 @@ import { BeforeAfterComparison } from '@/components/audio';
 import { useAudioRecorder } from '@/hooks';
 import { analyzeAudio, PROGRESS_MESSAGES, type AnalyzeResult } from '@/lib/api/analyze';
 import { useUserStore } from '@/lib/stores/user-store';
+import { useAuth } from '@/lib/auth/hooks';
 import type { CategoryFeedback } from '@/types/api';
 
 // 기본 면접 질문들
@@ -31,6 +32,7 @@ function QuickStudioContent() {
   const router = useRouter();
   const type = searchParams.get('type') || 'interview';
   const { voiceClone } = useUserStore();
+  const { user } = useAuth();
 
   const [step, setStep] = useState<Step>(type === 'free_speech' ? 'ready' : 'select');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -112,6 +114,7 @@ function QuickStudioContent() {
             question: currentQuestion || undefined,
             mode: 'quick',
             projectType: type === 'free_speech' ? 'free_speech' : 'interview',
+            userId: user?.id, // 보이스 클론 조회를 위해 userId 전달
             useVoiceClone: voiceClone.status === 'ready', // 보이스 클론이 준비되면 사용
           },
           {

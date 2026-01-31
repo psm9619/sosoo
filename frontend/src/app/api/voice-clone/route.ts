@@ -186,7 +186,8 @@ export async function POST(request: NextRequest) {
       voiceCloneRecord.id,
       audioBuffer,
       voiceName,
-      supabaseAdmin
+      supabaseAdmin,
+      baseMimeType // 원본 MIME 타입 전달
     );
 
     // 10. 즉시 응답 (processing 상태)
@@ -275,6 +276,22 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
+// MIME 타입에서 파일 확장자 추출
+function getExtensionFromMime(mimeType: string): string {
+  const mimeToExt: Record<string, string> = {
+    'audio/webm': 'webm',
+    'audio/mp4': 'm4a',
+    'audio/m4a': 'm4a',
+    'audio/x-m4a': 'm4a',
+    'audio/aac': 'm4a',
+    'audio/mpeg': 'mp3',
+    'audio/mp3': 'mp3',
+    'audio/wav': 'wav',
+    'audio/ogg': 'ogg',
+  };
+  return mimeToExt[mimeType] || 'webm';
+}
+
 /**
  * 비동기 클론 생성 (백그라운드)
  */
@@ -283,14 +300,21 @@ async function createVoiceCloneAsync(
   recordId: string,
   audioBuffer: ArrayBuffer,
   voiceName: string,
-  supabaseAdmin: ReturnType<typeof getSupabaseAdmin>
+  supabaseAdmin: ReturnType<typeof getSupabaseAdmin>,
+  originalMimeType?: string
 ) {
   try {
+    // MIME 타입 결정 (원본 유지 또는 기본값)
+    const mimeType = originalMimeType || 'audio/webm';
+    const extension = getExtensionFromMime(mimeType);
+
+    console.log('[VoiceClone] Creating clone with:', { mimeType, extension, bufferSize: audioBuffer.byteLength });
+
     // ElevenLabs IVC (Instant Voice Cloning) API 호출
     const formData = new FormData();
     formData.append('name', `voiceup_${userId.slice(0, 8)}_${voiceName}`);
     formData.append('description', `VoiceUp user voice clone`);
-    formData.append('files', new Blob([audioBuffer], { type: 'audio/webm' }), 'sample.webm');
+    formData.append('files', new Blob([audioBuffer], { type: mimeType }), `sample.${extension}`);
 
     const response = await fetch(`${ELEVENLABS_API_URL}/voices/add`, {
       method: 'POST',
