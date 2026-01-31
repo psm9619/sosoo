@@ -53,6 +53,15 @@ export interface Project {
   company?: string; // 회사명 (면접일 경우)
   position?: string; // 포지션 (면접일 경우)
   context?: string; // 추가 컨텍스트 (발표 자료 등)
+  // AI 컨텍스트 분석 결과 (Long-term Memory)
+  contextSummary?: string; // 문서 요약
+  contextKeywords?: string[]; // 핵심 키워드
+  contextExperiences?: {
+    title: string;
+    role: string;
+    achievements: string[];
+  }[];
+  contextStrengths?: string[]; // 강점
   questions: Question[];
   createdAt: string;
   updatedAt: string;

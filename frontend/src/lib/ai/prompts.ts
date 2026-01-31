@@ -3,6 +3,13 @@
  * Python backend/langgraph/utils/prompts.py를 TypeScript로 포팅
  */
 
+import type {
+  LongTermMemory,
+  ShortTermMemory,
+  ProgressiveContext,
+  PatternItem,
+} from './nodes/progressive-context';
+
 // ============================================
 // 분석 시스템 프롬프트
 // ============================================
@@ -51,17 +58,27 @@ export const ANALYSIS_SYSTEM_PROMPT = `당신은 10년 경력의 스피치 코�
 export const IMPROVEMENT_SYSTEM_PROMPT = `당신은 전문 스피치 라이터입니다.
 
 ## 목표
-원본 메시지와 화자의 스타일을 유지하면서 전달력을 개선합니다.
+원본 메시지의 전달력을 개선합니다.
 
-## 규칙
-1. 핵심 메시지를 절대 변경하지 마세요 (의도 보존)
-2. 화자의 어휘와 스타일을 유지하세요
-3. 분석에서 지적된 문제만 수정하세요
-4. 자연스럽고 말하기 쉬운 언어를 사용하세요
-5. 화자가 언급하지 않은 내용을 추가하지 마세요
+## 절대 금지 사항 (가장 중요)
+⚠️ 원본에 없는 정보를 절대 추가하지 마세요!
+- 원본에 언급되지 않은 학교, 전공, 직장, 경험, 성과, 목표를 지어내지 마세요
+- 구체적인 수치, 기간, 역할을 임의로 추가하지 마세요
+- "~한 경험이 있습니다", "~를 전공했습니다" 등 원본에 없는 사실을 만들지 마세요
+- 이를 위반하면 사용자에게 심각한 피해를 줄 수 있습니다
+
+## 허용되는 개선
+1. 추임새/필러워드 제거 (어, 음, 그, 이제 등)
+2. 문장 구조 정리 및 흐름 개선
+3. 반복되는 표현 정리
+4. 더 명확한 표현으로 대체 (의미 변경 없이)
+
+## 내용이 부족한 경우
+원본이 너무 짧거나 내용이 부족하면 다음 JSON을 반환하세요:
+{"error": "INSUFFICIENT_CONTENT", "message": "답변 내용이 부족하여 개선안을 생성할 수 없습니다. 더 구체적으로 말씀해주세요."}
 
 ## 출력
-개선된 스크립트만 출력하세요. 설명이나 부연은 불필요합니다.`;
+개선된 스크립트만 출력하세요. 원본에 있는 정보만 사용하세요.`;
 
 // ============================================
 // 반성 (Self-Review) 시스템 프롬프트
@@ -104,35 +121,43 @@ export const REFINEMENT_SYSTEM_PROMPT = `당신은 스피치 라이터입니다.
 ## 수정된 스크립트
 (여기에 수정된 스크립트)`;
 
+// Progressive Context 타입은 ./nodes/progressive-context.ts에서 import
+
 // ============================================
-// Progressive Context 타입 (메모리 시스템)
+// 헬퍼 함수
 // ============================================
 
-interface LongTermMemory {
-  summary: string;
-  keywords: string[];
-  experiences: Array<{
-    title: string;
-    role: string;
-    achievements: string[];
-    skills?: string[];
-  }>;
-  strengths: string[];
-  company?: string;
-  position?: string;
-  projectType: 'interview' | 'presentation' | 'free_speech';
+/**
+ * PatternItem[] 또는 string[]을 문자열로 변환
+ */
+function formatPatterns(patterns: PatternItem[] | string[]): string {
+  if (patterns.length === 0) return '';
+
+  // string[] 인 경우
+  if (typeof patterns[0] === 'string') {
+    return (patterns as string[]).join(', ');
+  }
+
+  // PatternItem[] 인 경우
+  return (patterns as PatternItem[])
+    .sort((a, b) => b.mentionCount - a.mentionCount)
+    .map((p) => (p.mentionCount > 1 ? `${p.pattern} (${p.mentionCount}회)` : p.pattern))
+    .join(', ');
 }
 
-interface ShortTermMemory {
-  growthPatterns: string[];
-  persistentWeaknesses: string[];
-  recentFeedbackSummary: string;
-  analyzedAttemptCount: number;
-}
+/**
+ * PatternItem[]에서 pattern 문자열만 추출
+ */
+function extractPatternStrings(patterns: PatternItem[] | string[]): string[] {
+  if (patterns.length === 0) return [];
 
-interface ProgressiveContext {
-  longTerm: LongTermMemory | null;
-  shortTerm: ShortTermMemory | null;
+  // string[] 인 경우
+  if (typeof patterns[0] === 'string') {
+    return patterns as string[];
+  }
+
+  // PatternItem[] 인 경우
+  return (patterns as PatternItem[]).map((p) => p.pattern);
 }
 
 // ============================================
@@ -219,11 +244,11 @@ export function buildAnalysisPrompt(params: AnalysisPromptParams): string {
     prompt += `## 최근 연습 패턴 (Short-term Context, ${st.analyzedAttemptCount}회 분석)\n`;
 
     if (st.growthPatterns.length > 0) {
-      prompt += `**성장 중인 영역** (격려 포인트): ${st.growthPatterns.join(', ')}\n`;
+      prompt += `**성장 중인 영역** (격려 포인트): ${formatPatterns(st.growthPatterns)}\n`;
     }
 
     if (st.persistentWeaknesses.length > 0) {
-      prompt += `**개선 필요 영역** (우선 피드백): ${st.persistentWeaknesses.join(', ')}\n`;
+      prompt += `**개선 필요 영역** (우선 피드백): ${formatPatterns(st.persistentWeaknesses)}\n`;
     }
 
     if (st.recentFeedbackSummary) {
@@ -282,7 +307,8 @@ export function buildAnalysisPrompt(params: AnalysisPromptParams): string {
 
   prompt += `위 정보를 바탕으로 종합 분석을 JSON 형식으로 제공하세요.`;
   if (progressiveContext?.shortTerm?.persistentWeaknesses?.length) {
-    prompt += `\n\n참고: 사용자의 지속적 약점(${progressiveContext.shortTerm.persistentWeaknesses.join(', ')})을 개선점으로 우선 반영해주세요.`;
+    const weaknessStrings = extractPatternStrings(progressiveContext.shortTerm.persistentWeaknesses);
+    prompt += `\n\n참고: 사용자의 지속적 약점(${weaknessStrings.join(', ')})을 개선점으로 우선 반영해주세요.`;
   }
 
   return prompt;
@@ -301,9 +327,12 @@ export function buildImprovementPrompt(params: ImprovementPromptParams): string 
 
   let prompt = '';
 
-  // Long-term Context (경험/배경 정보 - 개선 시 활용)
+  // 중요 경고 먼저 표시
+  prompt += `⚠️ 중요: 원본에 없는 정보(학교, 전공, 경험, 성과 등)를 절대 추가하지 마세요!\n\n`;
+
+  // Long-term Context (경험/배경 정보 - 사용자가 업로드한 문서에서만)
   if (longTermContext) {
-    prompt += `## 사용자 배경 (참고용)\n`;
+    prompt += `## 사용자가 제공한 배경 정보 (이 정보만 활용 가능)\n`;
 
     if (longTermContext.company || longTermContext.position) {
       prompt += `**지원 정보**: ${[longTermContext.company, longTermContext.position].filter(Boolean).join(' - ')}\n`;
@@ -314,26 +343,30 @@ export function buildImprovementPrompt(params: ImprovementPromptParams): string 
     }
 
     if (longTermContext.experiences.length > 0) {
-      prompt += `**활용 가능한 경험**:\n`;
+      prompt += `**경험**:\n`;
       longTermContext.experiences.slice(0, 2).forEach((exp) => {
         prompt += `- ${exp.title}: ${exp.achievements[0] || exp.role}\n`;
       });
     }
-    prompt += `\n※ 위 배경은 참고용입니다. 사용자가 직접 언급하지 않은 내용은 추가하지 마세요.\n\n`;
+    prompt += `\n※ 위 정보도 사용자가 원본에서 직접 언급한 경우에만 보완 용도로 사용하세요.\n\n`;
   }
 
   if (question) {
     prompt += `## 질문\n${question}\n\n`;
   }
 
-  prompt += `## 원본 발화\n${transcript}\n\n`;
+  prompt += `## 원본 발화 (이 내용만 기반으로 개선)\n${transcript}\n\n`;
 
-  prompt += `## 개선이 필요한 점 (우선순위순)\n`;
+  prompt += `## 개선이 필요한 점\n`;
   suggestions.slice(0, 3).forEach((s, i) => {
     prompt += `${i + 1}. [${s.category}] ${s.suggestion}\n`;
   });
 
-  prompt += `\n위 문제점을 개선한 스크립트를 작성하세요.`;
+  prompt += `\n## 지시사항
+1. 원본에 있는 정보만 사용하여 문장을 다듬으세요
+2. 추임새, 반복, 불명확한 표현만 수정하세요
+3. 새로운 사실, 경험, 수치를 추가하지 마세요
+4. 원본이 "뭐라고 말해야 될지 모르겠다"는 식이면, 그 부분만 자연스럽게 다듬거나 제거하세요`;
 
   return prompt;
 }

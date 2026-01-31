@@ -1,3 +1,4 @@
+export * from './analyze';
 export * from './client';
 export * from './sse';
 export * from './transform';

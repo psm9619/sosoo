@@ -1,20 +1,38 @@
 'use client';
 
-import { useState, Suspense, useRef } from 'react';
+import { useState, Suspense, useRef, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useProjectStore } from '@/lib/stores/project-store';
-import { INTERVIEW_CATEGORY_LABELS, type InterviewCategory, type Project } from '@/types';
+import { useAuth } from '@/lib/auth/hooks';
+import { createProject, createQuestions } from '@/lib/supabase/projects';
+import { INTERVIEW_CATEGORY_LABELS, type InterviewCategory, type Project, type Question } from '@/types';
+import type { DBInterviewCategory } from '@/lib/supabase/types';
 
 type Step = 'info' | 'context' | 'analyzing' | 'creating';
+
+// 로딩 중 표시할 격려 문구들
+const ENCOURAGING_QUOTES = [
+  { text: "완벽한 준비란 없습니다. 시작하는 것 자체가 이미 절반의 성공입니다.", author: "파블로 피카소" },
+  { text: "당신이 할 수 있다고 믿든, 할 수 없다고 믿든, 당신 말이 맞습니다.", author: "헨리 포드" },
+  { text: "성공은 매일 반복한 작은 노력들의 합입니다.", author: "로버트 콜리어" },
+  { text: "실패는 성공의 어머니입니다. 연습할수록 더 나아집니다.", author: "토마스 에디슨" },
+  { text: "긴장은 당신이 이것을 중요하게 생각한다는 증거입니다.", author: "unknown" },
+  { text: "두려움을 느끼면서도 행동하는 것, 그것이 진정한 용기입니다.", author: "넬슨 만델라" },
+  { text: "당신의 이야기는 누군가에게 영감이 됩니다. 자신있게 말해보세요.", author: "VoiceUp" },
+  { text: "오늘의 연습이 내일의 자신감이 됩니다.", author: "VoiceUp" },
+  { text: "면접관도 한때 지원자였습니다. 진정성 있게 대화하세요.", author: "VoiceUp" },
+  { text: "완벽하지 않아도 괜찮아요. 진심은 언제나 통합니다.", author: "VoiceUp" },
+];
 
 interface UploadedFile {
   name: string;
   size: number;
   type: string;
+  file: File;
 }
 
 function NewProjectContent() {
@@ -22,7 +40,8 @@ function NewProjectContent() {
   const router = useRouter();
   const type = searchParams.get('type') as 'interview' | 'presentation' || 'interview';
 
-  const { addProject, generateInterviewQuestions } = useProjectStore();
+  const { addProject } = useProjectStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [step, setStep] = useState<Step>('info');
   const [title, setTitle] = useState('');
@@ -43,11 +62,70 @@ function NewProjectContent() {
   const [presentationFile, setPresentationFile] = useState<UploadedFile | null>(null);
   const [analyzeProgress, setAnalyzeProgress] = useState(0);
 
+  // 로딩 중 격려 문구
+  const [showQuote, setShowQuote] = useState(false);
+  const [currentQuote, setCurrentQuote] = useState(ENCOURAGING_QUOTES[0]);
+
+  // 면접/발표 프로젝트는 로그인 필수 - 미로그인 시 리다이렉트
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated && (type === 'interview' || type === 'presentation')) {
+      // 로그인 후 복귀할 URL 저장
+      const returnUrl = `/studio/new?type=${type}`;
+      router.push(`/login?next=${encodeURIComponent(returnUrl)}`);
+    }
+  }, [authLoading, isAuthenticated, type, router]);
+
+  // 10초 이상 로딩 시 격려 문구 표시
+  useEffect(() => {
+    let quoteTimer: NodeJS.Timeout;
+    let rotateTimer: NodeJS.Timeout;
+
+    if (step === 'analyzing') {
+      quoteTimer = setTimeout(() => {
+        setShowQuote(true);
+        setCurrentQuote(ENCOURAGING_QUOTES[Math.floor(Math.random() * ENCOURAGING_QUOTES.length)]);
+      }, 10000);
+
+      rotateTimer = setInterval(() => {
+        if (showQuote) {
+          setCurrentQuote(ENCOURAGING_QUOTES[Math.floor(Math.random() * ENCOURAGING_QUOTES.length)]);
+        }
+      }, 8000);
+    } else {
+      setShowQuote(false);
+    }
+
+    return () => {
+      clearTimeout(quoteTimer);
+      clearInterval(rotateTimer);
+    };
+  }, [step, showQuote]);
+
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const additionalInputRef = useRef<HTMLInputElement>(null);
   const presentationInputRef = useRef<HTMLInputElement>(null);
 
   const isInterview = type === 'interview';
+
+  // 인증 로딩 중이거나 로그인 필요한데 미인증이면 로딩 표시
+  if (authLoading || (!isAuthenticated && (type === 'interview' || type === 'presentation'))) {
+    return (
+      <div className="min-h-screen flex flex-col bg-cream">
+        <Header />
+        <main className="flex-1 pt-16 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-teal-light/50 flex items-center justify-center animate-pulse">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </div>
+            <p className="text-gray-warm">로그인 확인 중...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const handleCategoryToggle = (category: InterviewCategory) => {
     setSelectedCategories((prev) =>
@@ -67,6 +145,7 @@ function NewProjectContent() {
         name: file.name,
         size: file.size,
         type: file.type,
+        file,
       });
     }
   };
@@ -78,6 +157,7 @@ function NewProjectContent() {
         name: file.name,
         size: file.size,
         type: file.type,
+        file,
       }));
       setAdditionalFiles((prev) => [...prev, ...newFiles]);
     }
@@ -103,72 +183,226 @@ function NewProjectContent() {
     setStep('analyzing');
     setAnalyzeProgress(0);
 
-    // Simulate AI analysis progress
-    const stages = [
-      { progress: 20, delay: 800 },
-      { progress: 45, delay: 1000 },
-      { progress: 70, delay: 1200 },
-      { progress: 90, delay: 800 },
-      { progress: 100, delay: 500 },
-    ];
+    let questions: Question[] = [];
+    let contextAnalysis: {
+      summary?: string;
+      keywords?: string[];
+      experiences?: unknown[];
+      strengths?: string[];
+      potentialQuestionAreas?: string[];
+    } | null = null;
 
-    for (const stage of stages) {
-      await new Promise((resolve) => setTimeout(resolve, stage.delay));
-      setAnalyzeProgress(stage.progress);
+    try {
+      const primaryFile = isInterview ? resumeFile : presentationFile;
+      console.log('[DEBUG] primaryFile:', primaryFile);
+
+      // Step 1: 파일이 있으면 컨텍스트 분석 실행
+      if (primaryFile && primaryFile.file) {
+        setAnalyzeProgress(10);
+        console.log('[DEBUG] Starting context analysis...');
+
+        const formData = new FormData();
+        formData.append('file', primaryFile.file);
+        formData.append('documentType', isInterview ? 'resume' : 'presentation');
+        formData.append('projectType', isInterview ? 'interview' : 'presentation');
+        if (company) formData.append('company', company);
+        if (position) formData.append('position', position);
+
+        const contextResponse = await fetch('/api/context/analyze', {
+          method: 'POST',
+          body: formData,
+        });
+
+        setAnalyzeProgress(40);
+
+        if (contextResponse.ok) {
+          const contextData = await contextResponse.json();
+          if (contextData.success && contextData.data) {
+            contextAnalysis = contextData.data;
+          }
+        }
+      }
+
+      setAnalyzeProgress(50);
+
+      // Step 2: 질문 생성
+      if (contextAnalysis) {
+        const questionsResponse = await fetch('/api/questions/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectType: isInterview ? 'interview' : 'presentation',
+            context: contextAnalysis,
+            company: isInterview ? company : undefined,
+            position: isInterview ? position : undefined,
+            questionsPerCategory: isInterview
+              ? selectedCategories.reduce(
+                  (acc, cat) => ({
+                    ...acc,
+                    [cat]: cat === 'competency' || cat === 'technical' ? 4 : cat === 'motivation' ? 2 : 1,
+                  }),
+                  {}
+                )
+              : undefined,
+            presentationQuestionCount: !isInterview ? 10 : undefined,
+          }),
+        });
+
+        setAnalyzeProgress(80);
+
+        if (questionsResponse.ok) {
+          const questionsData = await questionsResponse.json();
+          if (questionsData.success && questionsData.data?.questions) {
+            // 임시 ID로 질문 생성 (DB 저장 후 실제 ID로 교체됨)
+            questions = questionsData.data.questions.map(
+              (q: { text: string; category?: InterviewCategory }, index: number) => ({
+                id: `temp-q-${index + 1}`,
+                projectId: 'temp',
+                category: q.category,
+                text: q.text,
+                order: index + 1,
+                attempts: [],
+                createdAt: new Date().toISOString(),
+              })
+            );
+          }
+        }
+      }
+
+      // 질문이 생성되지 않았으면 기본 질문 사용
+      if (questions.length === 0) {
+        questions = isInterview
+          ? [
+              { id: 'temp-q-1', projectId: 'temp', category: 'basic' as InterviewCategory, text: '간단하게 자기소개 부탁드립니다.', order: 1, attempts: [], createdAt: new Date().toISOString() },
+              { id: 'temp-q-2', projectId: 'temp', category: 'motivation' as InterviewCategory, text: '왜 이 회사에 지원하셨나요?', order: 2, attempts: [], createdAt: new Date().toISOString() },
+              { id: 'temp-q-3', projectId: 'temp', category: 'competency' as InterviewCategory, text: '가장 성공적으로 완수한 프로젝트에 대해 말씀해주세요.', order: 3, attempts: [], createdAt: new Date().toISOString() },
+            ]
+          : [
+              { id: 'temp-q-1', projectId: 'temp', text: '이번 발표의 핵심 메시지는 무엇인가요?', order: 1, attempts: [], createdAt: new Date().toISOString() },
+              { id: 'temp-q-2', projectId: 'temp', text: '가장 큰 성과나 인사이트를 설명해주세요.', order: 2, attempts: [], createdAt: new Date().toISOString() },
+              { id: 'temp-q-3', projectId: 'temp', text: '예상되는 질문이나 반론에 어떻게 대응하시겠어요?', order: 3, attempts: [], createdAt: new Date().toISOString() },
+            ];
+      }
+    } catch (error) {
+      console.error('[DEBUG] Error in handleAnalyzeAndCreate:', error);
+      // API 실패 시 기본 질문 사용
+      questions = isInterview
+        ? [
+            { id: 'temp-q-1', projectId: 'temp', category: 'basic' as InterviewCategory, text: '간단하게 자기소개 부탁드립니다.', order: 1, attempts: [], createdAt: new Date().toISOString() },
+            { id: 'temp-q-2', projectId: 'temp', category: 'motivation' as InterviewCategory, text: '왜 이 회사에 지원하셨나요?', order: 2, attempts: [], createdAt: new Date().toISOString() },
+            { id: 'temp-q-3', projectId: 'temp', category: 'competency' as InterviewCategory, text: '가장 성공적으로 완수한 프로젝트에 대해 말씀해주세요.', order: 3, attempts: [], createdAt: new Date().toISOString() },
+          ]
+        : [
+            { id: 'temp-q-1', projectId: 'temp', text: '이번 발표의 핵심 메시지는 무엇인가요?', order: 1, attempts: [], createdAt: new Date().toISOString() },
+            { id: 'temp-q-2', projectId: 'temp', text: '가장 큰 성과나 인사이트를 설명해주세요.', order: 2, attempts: [], createdAt: new Date().toISOString() },
+            { id: 'temp-q-3', projectId: 'temp', text: '예상되는 질문이나 반론에 어떻게 대응하시겠어요?', order: 3, attempts: [], createdAt: new Date().toISOString() },
+          ];
     }
 
+    setAnalyzeProgress(100);
     setStep('creating');
 
-    // Simulate project creation
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // 프로젝트 생성
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const projectId = `proj-${Date.now()}`;
-    const questions = isInterview
-      ? generateInterviewQuestions(projectId).filter((q) =>
-          q.category ? selectedCategories.includes(q.category) : true
-        )
-      : [
-          {
-            id: `q-${Date.now()}-1`,
-            projectId,
-            text: '이번 발표의 핵심 메시지는 무엇인가요?',
-            order: 1,
-            attempts: [],
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: `q-${Date.now()}-2`,
-            projectId,
-            text: '가장 큰 성과나 인사이트를 설명해주세요.',
-            order: 2,
-            attempts: [],
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: `q-${Date.now()}-3`,
-            projectId,
-            text: '예상되는 질문이나 반론에 어떻게 대응하시겠어요?',
-            order: 3,
-            attempts: [],
-            createdAt: new Date().toISOString(),
-          },
-        ];
+    const projectTitle = title || (isInterview ? `${company} ${position} 면접` : '발표 연습');
 
-    const project: Project = {
-      id: projectId,
-      userId: 'user-1',
-      type,
-      title: title || (isInterview ? `${company} ${position} 면접` : '발표 연습'),
-      company: isInterview ? company : undefined,
-      position: isInterview ? position : undefined,
-      context: !isInterview ? context : undefined,
-      questions,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    // 로그인 사용자: Supabase DB에 저장
+    if (isAuthenticated && user) {
+      try {
+        // 1. 프로젝트 생성
+        const dbProject = await createProject({
+          user_id: user.id,
+          type,
+          title: projectTitle,
+          company: isInterview ? company : null,
+          position: isInterview ? position : null,
+          description: !isInterview ? context : null,
+          context_summary: contextAnalysis?.summary || null,
+          context_keywords: contextAnalysis?.keywords || null,
+          context_experiences: contextAnalysis?.experiences?.map((exp: unknown) => {
+            const e = exp as { title?: string; role?: string; achievements?: string[]; skills?: string[] };
+            return {
+              title: e.title || '',
+              role: e.role || '',
+              achievements: e.achievements || [],
+              skills: e.skills,
+            };
+          }) || null,
+        });
 
-    addProject(project);
-    router.push(`/studio/${projectId}`);
+        // 2. 질문 일괄 생성
+        const dbQuestions = await createQuestions(
+          dbProject.id,
+          questions.map((q) => ({
+            text: q.text,
+            category: q.category as DBInterviewCategory | null || null,
+            order: q.order,
+            is_ai_generated: true,
+          }))
+        );
+
+        // 3. 로컬 스토어에도 추가 (캐시 역할)
+        const project: Project = {
+          ...dbProject,
+          questions: dbQuestions.map((q) => ({ ...q, attempts: [] })),
+        };
+        addProject(project);
+
+        router.push(`/studio/${dbProject.id}`);
+      } catch (error) {
+        console.error('[DB Save Error]', error);
+        // DB 저장 실패 시 로컬에만 저장 (fallback)
+        const localProjectId = `proj-${Date.now()}`;
+        const project: Project = {
+          id: localProjectId,
+          userId: user.id,
+          type,
+          title: projectTitle,
+          company: isInterview ? company : undefined,
+          position: isInterview ? position : undefined,
+          context: !isInterview ? context : undefined,
+          contextSummary: contextAnalysis?.summary,
+          contextKeywords: contextAnalysis?.keywords,
+          contextExperiences: contextAnalysis?.experiences as Project['contextExperiences'],
+          contextStrengths: contextAnalysis?.strengths,
+          questions: questions.map((q, i) => ({
+            ...q,
+            id: `q-${Date.now()}-${i + 1}`,
+            projectId: localProjectId,
+          })),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        addProject(project);
+        router.push(`/studio/${localProjectId}`);
+      }
+    } else {
+      // 비로그인 사용자: localStorage에만 저장 (기존 방식)
+      const localProjectId = `proj-${Date.now()}`;
+      const project: Project = {
+        id: localProjectId,
+        userId: 'guest',
+        type,
+        title: projectTitle,
+        company: isInterview ? company : undefined,
+        position: isInterview ? position : undefined,
+        context: !isInterview ? context : undefined,
+        contextSummary: contextAnalysis?.summary,
+        contextKeywords: contextAnalysis?.keywords,
+        contextExperiences: contextAnalysis?.experiences as Project['contextExperiences'],
+        contextStrengths: contextAnalysis?.strengths,
+        questions: questions.map((q, i) => ({
+          ...q,
+          id: `q-${Date.now()}-${i + 1}`,
+          projectId: localProjectId,
+        })),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      addProject(project);
+      router.push(`/studio/${localProjectId}`);
+    }
   };
 
   const canProceedToContext = isInterview
@@ -521,10 +755,29 @@ function NewProjectContent() {
                 {analyzeProgress >= 60 && analyzeProgress < 90 && '맞춤 질문을 생성하고 있어요...'}
                 {analyzeProgress >= 90 && '거의 완료됐어요!'}
               </p>
-              <div className="max-w-sm mx-auto">
+              <div className="max-w-sm mx-auto mb-8">
                 <Progress value={analyzeProgress} className="h-2 mb-2" />
                 <p className="text-sm text-gray-soft">{analyzeProgress}%</p>
               </div>
+
+              {/* 10초 이상 로딩 시 격려 문구 표시 */}
+              {showQuote && (
+                <div className="animate-fade-in max-w-md mx-auto mt-8 p-6 bg-warm-white/80 rounded-2xl border border-border/50">
+                  <svg
+                    className="w-8 h-8 mx-auto mb-4 text-teal/60"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
+                  </svg>
+                  <p className="text-charcoal font-medium mb-2 leading-relaxed">
+                    &ldquo;{currentQuote.text}&rdquo;
+                  </p>
+                  <p className="text-sm text-gray-soft">
+                    — {currentQuote.author}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

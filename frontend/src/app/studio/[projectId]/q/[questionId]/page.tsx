@@ -10,7 +10,11 @@ import { Progress } from '@/components/ui/progress';
 import { VoiceWave } from '@/components/home';
 import { useAudioRecorder } from '@/hooks';
 import { useProjectStore } from '@/lib/stores/project-store';
-import { INTERVIEW_CATEGORY_LABELS, type Attempt } from '@/types';
+import { useAuth } from '@/lib/auth/hooks';
+import { getProjectById } from '@/lib/supabase/projects';
+import { createAttempt } from '@/lib/supabase/attempts';
+import { analyzeAudio, PROGRESS_MESSAGES, type AnalyzeResult } from '@/lib/api/analyze';
+import { INTERVIEW_CATEGORY_LABELS, type Attempt, type Project, type Question } from '@/types';
 
 type Step = 'ready' | 'recording' | 'processing' | 'result';
 
@@ -20,20 +24,24 @@ export default function QuestionRecordingPage() {
   const projectId = params.projectId as string;
   const questionId = params.questionId as string;
 
-  const { projects, addAttempt } = useProjectStore();
-  const project = projects.find((p) => p.id === projectId);
-  const question = project?.questions.find((q) => q.id === questionId);
-  const questionIndex = project?.questions.findIndex((q) => q.id === questionId) ?? 0;
+  const { projects: localProjects, addAttempt: addLocalAttempt } = useProjectStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+
+  const [project, setProject] = useState<Project | null>(null);
+  const [question, setQuestion] = useState<Question | null>(null);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [isLoadingProject, setIsLoadingProject] = useState(true);
 
   const [step, setStep] = useState<Step>('ready');
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingMessage, setProcessingMessage] = useState('');
   const [currentAttempt, setCurrentAttempt] = useState<Attempt | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const {
     isRecording,
     isPaused,
     duration,
-    audioBlob,
     audioUrl,
     start,
     stop,
@@ -46,6 +54,50 @@ export default function QuestionRecordingPage() {
     onMaxDurationReached: () => stop(),
   });
 
+  // 프로젝트 로드
+  useEffect(() => {
+    async function loadProject() {
+      setIsLoadingProject(true);
+
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId);
+
+      if (isUUID && isAuthenticated) {
+        try {
+          const dbProject = await getProjectById(projectId);
+          if (dbProject) {
+            setProject(dbProject);
+            const q = dbProject.questions.find(q => q.id === questionId);
+            setQuestion(q || null);
+            setQuestionIndex(dbProject.questions.findIndex(q => q.id === questionId));
+          }
+        } catch (err) {
+          console.error('[loadProject] DB Error:', err);
+          const localProject = localProjects.find(p => p.id === projectId);
+          if (localProject) {
+            setProject(localProject);
+            const q = localProject.questions.find(q => q.id === questionId);
+            setQuestion(q || null);
+            setQuestionIndex(localProject.questions.findIndex(q => q.id === questionId));
+          }
+        }
+      } else {
+        const localProject = localProjects.find(p => p.id === projectId);
+        if (localProject) {
+          setProject(localProject);
+          const q = localProject.questions.find(q => q.id === questionId);
+          setQuestion(q || null);
+          setQuestionIndex(localProject.questions.findIndex(q => q.id === questionId));
+        }
+      }
+
+      setIsLoadingProject(false);
+    }
+
+    if (!authLoading) {
+      loadProject();
+    }
+  }, [projectId, questionId, isAuthenticated, authLoading, localProjects]);
+
   useEffect(() => {
     if (isRecording) {
       setStep('recording');
@@ -54,49 +106,147 @@ export default function QuestionRecordingPage() {
 
   const handleStartRecording = async () => {
     try {
+      setError(null);
       await start();
-    } catch (error) {
+    } catch {
       alert('마이크 권한이 필요합니다.');
     }
   };
 
-  const handleStopRecording = useCallback(() => {
-    stop();
+  const gradeToScore = (grade: string): number => {
+    const gradeMap: Record<string, number> = {
+      'A': 95, 'A-': 90,
+      'B+': 87, 'B': 83, 'B-': 80,
+      'C+': 77, 'C': 73, 'C-': 70,
+      'D+': 67, 'D': 63, 'D-': 60,
+      'F': 50,
+    };
+    return gradeMap[grade] || 70;
+  };
+
+  const calculateOverallScore = (scores: Record<string, string>): number => {
+    const values = Object.values(scores).map(gradeToScore);
+    if (values.length === 0) return 70;
+    return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+  };
+
+  const handleStopRecording = useCallback(async () => {
     setStep('processing');
+    setProcessingProgress(0);
+    setProcessingMessage(PROGRESS_MESSAGES.start);
 
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 15;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
+    const recordedBlob = await stop();
 
-        // Create mock attempt result
-        const attempt: Attempt = {
-          id: `att-${Date.now()}`,
-          questionId,
-          createdAt: new Date().toISOString(),
-          duration,
-          originalText: '음... 안녕하세요, 저는 그, 개발자로 일하고 있는데요...',
-          improvedText: '안녕하세요, 3년차 프론트엔드 개발자입니다. React와 TypeScript를 주력으로 사용하며...',
-          improvements: ['추임새 제거', '문장 구조화', '전문성 강조'],
-          score: Math.floor(Math.random() * 20) + 75, // 75-95
-        };
+    if (!recordedBlob) {
+      setError('녹음된 오디오가 없습니다.');
+      setStep('ready');
+      return;
+    }
 
-        setCurrentAttempt(attempt);
-        addAttempt(projectId, questionId, attempt);
+    try {
+      await analyzeAudio(
+        {
+          audioBlob: recordedBlob,
+          question: question?.text,
+          projectId,
+          mode: 'quick',
+          projectType: project?.type,
+          userId: isAuthenticated && user ? user.id : undefined,
+        },
+        {
+          onProgress: (progress) => {
+            setProcessingProgress(progress.progress);
+            setProcessingMessage(
+              PROGRESS_MESSAGES[progress.step] || progress.message || '처리 중...'
+            );
+          },
+          onComplete: async (result: AnalyzeResult) => {
+            const attempt: Attempt = {
+              id: `att-${Date.now()}`,
+              questionId,
+              createdAt: new Date().toISOString(),
+              duration,
+              originalText: result.transcript,
+              improvedText: result.improvedScript,
+              originalAudioUrl: audioUrl || undefined,
+              improvedAudioUrl: result.improvedAudioUrl,
+              improvements: result.analysisResult?.suggestions?.slice(0, 3).map((s) => s.suggestion) || [],
+              score: result.analysisResult?.scores ? calculateOverallScore(result.analysisResult.scores as unknown as Record<string, string>) : 75,
+            };
 
-        setTimeout(() => setStep('result'), 500);
-      }
-      setProcessingProgress(progress);
-    }, 500);
-  }, [stop, duration, questionId, projectId, addAttempt]);
+            // 로그인 사용자: DB에 저장
+            if (isAuthenticated && user) {
+              try {
+                const dbAttempt = await createAttempt({
+                  question_id: questionId,
+                  user_id: user.id,
+                  original_text: result.transcript,
+                  duration_seconds: duration,
+                  analysis: result.analysisResult ? {
+                    scores: result.analysisResult.scores as unknown as {
+                      logic_structure: string;
+                      filler_words: string;
+                      speaking_pace: string;
+                      confidence_tone: string;
+                      content_specificity: string;
+                    },
+                    metrics: {
+                      words_per_minute: result.analysisResult.metrics?.wordsPerMinute || 0,
+                      filler_count: result.analysisResult.metrics?.fillerCount || 0,
+                      filler_percentage: result.analysisResult.metrics?.fillerPercentage || 0,
+                      total_words: result.analysisResult.metrics?.totalWords || 0,
+                    },
+                    suggestions: result.analysisResult.suggestions?.map(s => ({
+                      priority: s.priority,
+                      category: s.category,
+                      suggestion: s.suggestion,
+                      impact: s.impact,
+                    })) || [],
+                    structure_analysis: result.analysisResult.structureAnalysis || undefined,
+                    progressive_context_note: result.analysisResult.progressiveContextNote || undefined,
+                  } : null,
+                  improved_text: result.improvedScript,
+                  improvements: attempt.improvements,
+                  score: attempt.score,
+                  original_audio_url: audioUrl || null,
+                  improved_audio_url: result.improvedAudioUrl || null,
+                  status: 'completed',
+                });
+
+                // DB 저장 성공 시 DB의 ID 사용
+                attempt.id = dbAttempt.id;
+                console.log('[DB] Attempt saved:', dbAttempt.id);
+              } catch (err) {
+                console.error('[DB] Attempt save error:', err);
+                // DB 저장 실패해도 로컬에는 저장
+              }
+            }
+
+            // 로컬 스토어에도 저장
+            addLocalAttempt(projectId, questionId, attempt);
+
+            setCurrentAttempt(attempt);
+            setStep('result');
+          },
+          onError: (err) => {
+            setError(err.message);
+            setStep('ready');
+          },
+        }
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '분석 중 오류가 발생했습니다.');
+      setStep('ready');
+    }
+  }, [stop, audioUrl, question?.text, projectId, questionId, duration, addLocalAttempt, isAuthenticated, user, project?.type]);
 
   const handleRetry = () => {
     reset();
     setStep('ready');
     setProcessingProgress(0);
+    setProcessingMessage('');
     setCurrentAttempt(null);
+    setError(null);
   };
 
   const handleNextQuestion = () => {
@@ -123,6 +273,27 @@ export default function QuestionRecordingPage() {
     setCurrentAttempt(null);
   };
 
+  // 로딩 상태
+  if (authLoading || isLoadingProject) {
+    return (
+      <div className="min-h-screen flex flex-col bg-cream">
+        <Header />
+        <main className="flex-1 pt-16 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-teal-light/50 flex items-center justify-center animate-pulse">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" />
+                <path d="M2 17L12 22L22 17" />
+                <path d="M2 12L12 17L22 12" />
+              </svg>
+            </div>
+            <p className="text-gray-warm">로딩 중...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   if (!project || !question) {
     return (
       <div className="min-h-screen flex flex-col bg-cream">
@@ -130,6 +301,7 @@ export default function QuestionRecordingPage() {
         <main className="flex-1 pt-16 flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-charcoal mb-4">질문을 찾을 수 없어요</h1>
+            <p className="text-gray-warm mb-6">프로젝트를 먼저 생성해주세요.</p>
             <Button onClick={() => router.push('/studio')}>스튜디오로 돌아가기</Button>
           </div>
         </main>
@@ -137,7 +309,6 @@ export default function QuestionRecordingPage() {
     );
   }
 
-  const isInterview = project.type === 'interview';
   const isLastQuestion = questionIndex === project.questions.length - 1;
 
   return (
@@ -160,6 +331,13 @@ export default function QuestionRecordingPage() {
               {questionIndex + 1} / {project.questions.length}
             </span>
           </div>
+
+          {/* Error Alert */}
+          {error && (
+            <Card className="p-4 mb-6 bg-coral-light/30 border border-coral/30">
+              <p className="text-coral text-sm">{error}</p>
+            </Card>
+          )}
 
           {/* Question Card */}
           <Card className="p-6 bg-warm-white border-none mb-8">
@@ -277,7 +455,7 @@ export default function QuestionRecordingPage() {
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-charcoal mb-2">AI가 분석 중이에요</h2>
-              <p className="text-gray-warm mb-8">발화 패턴을 분석하고 개선 버전을 만들고 있어요.</p>
+              <p className="text-gray-warm mb-8">{processingMessage || '발화 패턴을 분석하고 개선 버전을 만들고 있어요.'}</p>
 
               <div className="max-w-sm mx-auto">
                 <Progress value={processingProgress} className="h-2 mb-2" />
@@ -298,6 +476,21 @@ export default function QuestionRecordingPage() {
               </div>
 
               <div className="space-y-4 mb-8">
+                {/* 개선 버전 먼저 표시 (After-First UX) */}
+                <Card className="p-6 bg-teal-light/20 border border-teal/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-teal uppercase">개선 버전</span>
+                  </div>
+                  <p className="text-charcoal mb-4 leading-relaxed">
+                    {currentAttempt.improvedText}
+                  </p>
+                  {currentAttempt.improvedAudioUrl && (
+                    <audio controls className="w-full" src={currentAttempt.improvedAudioUrl}>
+                      <track kind="captions" />
+                    </audio>
+                  )}
+                </Card>
+
                 <Card className="p-6 bg-warm-white border-none">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-medium text-gray-soft uppercase">원본</span>
@@ -306,23 +499,11 @@ export default function QuestionRecordingPage() {
                   <p className="text-charcoal/70 mb-4 leading-relaxed">
                     {currentAttempt.originalText}
                   </p>
-                  {audioUrl && (
-                    <audio controls className="w-full" src={audioUrl}>
+                  {(currentAttempt.originalAudioUrl || audioUrl) && (
+                    <audio controls className="w-full" src={currentAttempt.originalAudioUrl || audioUrl || undefined}>
                       <track kind="captions" />
                     </audio>
                   )}
-                </Card>
-
-                <Card className="p-6 bg-teal-light/20 border border-teal/20">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-teal uppercase">개선 버전</span>
-                  </div>
-                  <p className="text-charcoal mb-4 leading-relaxed">
-                    {currentAttempt.improvedText}
-                  </p>
-                  <audio controls className="w-full">
-                    <track kind="captions" />
-                  </audio>
                 </Card>
               </div>
 
