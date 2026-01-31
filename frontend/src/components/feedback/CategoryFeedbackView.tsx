@@ -58,18 +58,34 @@ export function CategoryFeedbackView({ feedback }: CategoryFeedbackViewProps) {
             <button
               key={key}
               onClick={() => toggleCategory(key)}
-              className={`p-3 sm:p-4 rounded-xl border transition-all text-left cursor-pointer ${levelStyle.bg} ${levelStyle.border} ${
+              className={`p-3 sm:p-4 rounded-xl border transition-all text-left cursor-pointer group ${levelStyle.bg} ${levelStyle.border} ${
                 isExpanded
                   ? 'ring-2 ring-teal/50 shadow-sm'
-                  : 'hover:shadow-md'
+                  : 'hover:shadow-md hover:border-gray-soft/50'
               }`}
             >
-              {/* 헤더: 카테고리명 + 레벨 */}
+              {/* 헤더: 카테고리명 + 레벨 + 화살표 */}
               <div className="flex items-center justify-between mb-2">
                 <span className="font-semibold text-charcoal text-sm">{label}</span>
-                <span className={`text-xs font-medium ${levelStyle.text}`}>
-                  {category.label}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-xs font-medium ${levelStyle.text}`}>
+                    {category.label}
+                  </span>
+                  {/* 펼침 화살표 */}
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className={`text-gray-soft transition-transform duration-200 ${
+                      isExpanded ? 'rotate-180 text-teal' : 'group-hover:text-charcoal'
+                    }`}
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </div>
               </div>
 
               {/* 서브카테고리 요약 (최대 3개) */}
