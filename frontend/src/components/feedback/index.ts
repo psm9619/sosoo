@@ -1,0 +1,1 @@
+export { RefinementPanel } from './RefinementPanel';

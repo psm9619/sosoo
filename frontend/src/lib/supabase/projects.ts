@@ -46,6 +46,8 @@ export async function createProject(data: CreateProjectInput): Promise<Project> 
 export async function getProjects(userId: string): Promise<Project[]> {
   const supabase = createClient();
 
+  console.log('[getProjects] Fetching projects for user:', userId);
+
   // 프로젝트 목록 조회
   const { data: projects, error: projectsError } = await supabase
     .from('projects')
@@ -60,8 +62,11 @@ export async function getProjects(userId: string): Promise<Project[]> {
   }
 
   if (!projects || projects.length === 0) {
+    console.log('[getProjects] No projects found');
     return [];
   }
+
+  console.log('[getProjects] Found', projects.length, 'projects');
 
   // 각 프로젝트의 질문과 시도 개수 조회
   const projectIds = projects.map(p => p.id);
@@ -75,10 +80,12 @@ export async function getProjects(userId: string): Promise<Project[]> {
     console.error('[getProjects] Questions error:', questionsError);
   }
 
+  console.log('[getProjects] Found', questions?.length || 0, 'questions');
+
   // 질문 ID 목록
   const questionIds = questions?.map(q => q.id) || [];
 
-  // 시도 개수 조회
+  // 시도 개수 조회 (question_id별로)
   const { data: attempts, error: attemptsError } = await supabase
     .from('attempts')
     .select('id, question_id')
@@ -88,48 +95,55 @@ export async function getProjects(userId: string): Promise<Project[]> {
     console.error('[getProjects] Attempts error:', attemptsError);
   }
 
-  // 프로젝트별 질문 수와 시도 수 계산
-  const questionCountByProject: Record<string, number> = {};
-  const attemptCountByProject: Record<string, number> = {};
+  console.log('[getProjects] Found', attempts?.length || 0, 'attempts');
 
-  questions?.forEach(q => {
-    questionCountByProject[q.project_id] = (questionCountByProject[q.project_id] || 0) + 1;
-  });
-
-  // question_id로 project_id 매핑
-  const questionToProject: Record<string, string> = {};
-  questions?.forEach(q => {
-    questionToProject[q.id] = q.project_id;
-  });
-
+  // 질문별 시도 수 계산
+  const attemptCountByQuestion: Record<string, number> = {};
   attempts?.forEach(a => {
-    const projectId = questionToProject[a.question_id];
-    if (projectId) {
-      attemptCountByProject[projectId] = (attemptCountByProject[projectId] || 0) + 1;
+    attemptCountByQuestion[a.question_id] = (attemptCountByQuestion[a.question_id] || 0) + 1;
+  });
+
+  // 프로젝트별 질문 그룹화
+  const questionsByProject: Record<string, Array<{ id: string; project_id: string }>> = {};
+  questions?.forEach(q => {
+    if (!questionsByProject[q.project_id]) {
+      questionsByProject[q.project_id] = [];
     }
+    questionsByProject[q.project_id].push(q);
   });
 
   // 변환
   const { dbProjectToProject } = await import('./types');
   return projects.map(p => {
     const project = dbProjectToProject(p as DBProject);
-    // 빈 questions 배열 생성 (상세 조회 시 채움)
-    project.questions = Array(questionCountByProject[p.id] || 0).fill(null).map((_, i) => ({
-      id: `placeholder-${i}`,
-      projectId: p.id,
-      text: '',
-      order: i + 1,
-      attempts: Array(Math.floor((attemptCountByProject[p.id] || 0) / Math.max(questionCountByProject[p.id] || 1, 1))).fill(null).map((_, j) => ({
-        id: `placeholder-${j}`,
-        questionId: '',
+    const projectQuestions = questionsByProject[p.id] || [];
+
+    // 각 질문에 대해 실제 시도 수를 반영한 placeholder 생성
+    project.questions = projectQuestions.map((q, i) => {
+      const attemptCount = attemptCountByQuestion[q.id] || 0;
+      return {
+        id: q.id, // 실제 질문 ID 사용
+        projectId: p.id,
+        text: '',
+        order: i + 1,
+        // 시도 수만큼 placeholder 생성 (실제 데이터는 상세 조회에서)
+        attempts: Array(attemptCount).fill(null).map((_, j) => ({
+          id: `placeholder-${j}`,
+          questionId: q.id,
+          createdAt: '',
+          duration: 0,
+          originalText: '',
+          improvedText: '',
+          improvements: [],
+        })),
         createdAt: '',
-        duration: 0,
-        originalText: '',
-        improvedText: '',
-        improvements: [],
-      })),
-      createdAt: '',
-    }));
+      };
+    });
+
+    const totalAttempts = project.questions.reduce((acc, q) => acc + q.attempts.length, 0);
+    const questionsWithAttempts = project.questions.filter(q => q.attempts.length > 0).length;
+    console.log('[getProjects] Project', p.title, ':', project.questions.length, 'questions,', totalAttempts, 'attempts,', questionsWithAttempts, 'with attempts');
+
     return project;
   });
 }
@@ -140,6 +154,8 @@ export async function getProjects(userId: string): Promise<Project[]> {
 export async function getProjectById(projectId: string): Promise<Project | null> {
   const supabase = createClient();
 
+  console.log('[getProjectById] Fetching project:', projectId);
+
   // 프로젝트 조회
   const { data: project, error: projectError } = await supabase
     .from('projects')
@@ -149,11 +165,14 @@ export async function getProjectById(projectId: string): Promise<Project | null>
 
   if (projectError) {
     if (projectError.code === 'PGRST116') {
+      console.log('[getProjectById] Project not found');
       return null; // Not found
     }
     console.error('[getProjectById] Error:', projectError);
     throw new Error(`프로젝트 조회 실패: ${projectError.message}`);
   }
+
+  console.log('[getProjectById] Project found:', project.id, project.title);
 
   // 질문 조회
   const { data: questions, error: questionsError } = await supabase
@@ -167,11 +186,14 @@ export async function getProjectById(projectId: string): Promise<Project | null>
     throw new Error(`질문 조회 실패: ${questionsError.message}`);
   }
 
+  console.log('[getProjectById] Questions found:', questions?.length || 0);
+
   // 시도 조회
   const questionIds = questions?.map(q => q.id) || [];
   let attempts: unknown[] = [];
 
   if (questionIds.length > 0) {
+    console.log('[getProjectById] Fetching attempts for questions:', questionIds.length);
     const { data: attemptData, error: attemptsError } = await supabase
       .from('attempts')
       .select('*')
@@ -182,6 +204,7 @@ export async function getProjectById(projectId: string): Promise<Project | null>
       console.error('[getProjectById] Attempts error:', attemptsError);
     }
     attempts = attemptData || [];
+    console.log('[getProjectById] Attempts found:', attempts.length);
   }
 
   // 변환

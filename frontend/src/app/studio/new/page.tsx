@@ -55,6 +55,7 @@ function NewProjectContent() {
     'technical',
     'situation',
   ]);
+  const [targetDate, setTargetDate] = useState('');
 
   // File upload states
   const [resumeFile, setResumeFile] = useState<UploadedFile | null>(null);
@@ -199,7 +200,11 @@ function NewProjectContent() {
       // Step 1: 파일이 있으면 컨텍스트 분석 실행
       if (primaryFile && primaryFile.file) {
         setAnalyzeProgress(10);
-        console.log('[DEBUG] Starting context analysis...');
+        console.log('[DEBUG] Starting context analysis...', {
+          fileName: primaryFile.file.name,
+          fileSize: primaryFile.file.size,
+          fileType: primaryFile.file.type,
+        });
 
         const formData = new FormData();
         formData.append('file', primaryFile.file);
@@ -208,18 +213,29 @@ function NewProjectContent() {
         if (company) formData.append('company', company);
         if (position) formData.append('position', position);
 
-        const contextResponse = await fetch('/api/context/analyze', {
-          method: 'POST',
-          body: formData,
-        });
+        try {
+          const contextResponse = await fetch('/api/context/analyze', {
+            method: 'POST',
+            body: formData,
+          });
 
-        setAnalyzeProgress(40);
+          setAnalyzeProgress(40);
 
-        if (contextResponse.ok) {
           const contextData = await contextResponse.json();
-          if (contextData.success && contextData.data) {
+          console.log('[DEBUG] Context analysis response:', {
+            status: contextResponse.status,
+            ok: contextResponse.ok,
+            data: contextData
+          });
+
+          if (contextResponse.ok && contextData.success && contextData.data) {
             contextAnalysis = contextData.data;
+            console.log('[DEBUG] Context analysis successful:', contextAnalysis);
+          } else {
+            console.warn('[DEBUG] Context analysis failed:', contextData.error || 'Unknown error');
           }
+        } catch (fetchError) {
+          console.error('[DEBUG] Context analysis fetch error:', fetchError);
         }
       }
 
@@ -227,32 +243,40 @@ function NewProjectContent() {
 
       // Step 2: 질문 생성
       if (contextAnalysis) {
-        const questionsResponse = await fetch('/api/questions/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            projectType: isInterview ? 'interview' : 'presentation',
-            context: contextAnalysis,
-            company: isInterview ? company : undefined,
-            position: isInterview ? position : undefined,
-            questionsPerCategory: isInterview
-              ? selectedCategories.reduce(
-                  (acc, cat) => ({
-                    ...acc,
-                    [cat]: cat === 'competency' || cat === 'technical' ? 4 : cat === 'motivation' ? 2 : 1,
-                  }),
-                  {}
-                )
-              : undefined,
-            presentationQuestionCount: !isInterview ? 10 : undefined,
-          }),
-        });
+        console.log('[DEBUG] Starting question generation with context:', contextAnalysis);
 
-        setAnalyzeProgress(80);
+        try {
+          const questionsResponse = await fetch('/api/questions/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectType: isInterview ? 'interview' : 'presentation',
+              context: contextAnalysis,
+              company: isInterview ? company : undefined,
+              position: isInterview ? position : undefined,
+              questionsPerCategory: isInterview
+                ? selectedCategories.reduce(
+                    (acc, cat) => ({
+                      ...acc,
+                      [cat]: cat === 'competency' || cat === 'technical' ? 4 : cat === 'motivation' ? 2 : 1,
+                    }),
+                    {}
+                  )
+                : undefined,
+              presentationQuestionCount: !isInterview ? 10 : undefined,
+            }),
+          });
 
-        if (questionsResponse.ok) {
+          setAnalyzeProgress(80);
+
           const questionsData = await questionsResponse.json();
-          if (questionsData.success && questionsData.data?.questions) {
+          console.log('[DEBUG] Question generation response:', {
+            status: questionsResponse.status,
+            ok: questionsResponse.ok,
+            data: questionsData
+          });
+
+          if (questionsResponse.ok && questionsData.success && questionsData.data?.questions) {
             // 임시 ID로 질문 생성 (DB 저장 후 실제 ID로 교체됨)
             questions = questionsData.data.questions.map(
               (q: { text: string; category?: InterviewCategory }, index: number) => ({
@@ -265,8 +289,15 @@ function NewProjectContent() {
                 createdAt: new Date().toISOString(),
               })
             );
+            console.log('[DEBUG] Generated questions:', questions.length);
+          } else {
+            console.warn('[DEBUG] Question generation failed:', questionsData.error || 'Unknown error');
           }
+        } catch (fetchError) {
+          console.error('[DEBUG] Question generation fetch error:', fetchError);
         }
+      } else {
+        console.log('[DEBUG] No context analysis, skipping question generation');
       }
 
       // 질문이 생성되지 않았으면 기본 질문 사용
@@ -329,6 +360,7 @@ function NewProjectContent() {
               skills: e.skills,
             };
           }) || null,
+          target_date: targetDate || null,
         });
 
         // 2. 질문 일괄 생성
@@ -366,6 +398,7 @@ function NewProjectContent() {
           contextKeywords: contextAnalysis?.keywords,
           contextExperiences: contextAnalysis?.experiences as Project['contextExperiences'],
           contextStrengths: contextAnalysis?.strengths,
+          targetDate: targetDate || undefined,
           questions: questions.map((q, i) => ({
             ...q,
             id: `q-${Date.now()}-${i + 1}`,
@@ -392,6 +425,7 @@ function NewProjectContent() {
         contextKeywords: contextAnalysis?.keywords,
         contextExperiences: contextAnalysis?.experiences as Project['contextExperiences'],
         contextStrengths: contextAnalysis?.strengths,
+        targetDate: targetDate || undefined,
         questions: questions.map((q, i) => ({
           ...q,
           id: `q-${Date.now()}-${i + 1}`,
@@ -473,32 +507,60 @@ function NewProjectContent() {
                           className="w-full px-4 py-3 rounded-xl border border-border bg-cream focus:outline-none focus:ring-2 focus:ring-teal"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-charcoal mb-2">
-                          프로젝트 제목 (선택)
-                        </label>
-                        <input
-                          type="text"
-                          value={title}
-                          onChange={(e) => setTitle(e.target.value)}
-                          placeholder={`자동 생성: ${company || '패스트캠퍼스'} ${position || '비즈니스 애널리스트'} 면접`}
-                          className="w-full px-4 py-3 rounded-xl border border-border bg-cream focus:outline-none focus:ring-2 focus:ring-teal"
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-charcoal mb-2">
+                            프로젝트 제목 (선택)
+                          </label>
+                          <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder={`자동: ${company || '회사'} ${position || '포지션'}`}
+                            className="w-full px-4 py-3 rounded-xl border border-border bg-cream focus:outline-none focus:ring-2 focus:ring-teal"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-charcoal mb-2">
+                            면접 예정일 (선택)
+                          </label>
+                          <input
+                            type="date"
+                            value={targetDate}
+                            onChange={(e) => setTargetDate(e.target.value)}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="w-full px-4 py-3 rounded-xl border border-border bg-cream focus:outline-none focus:ring-2 focus:ring-teal"
+                          />
+                        </div>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div>
-                        <label className="block text-sm font-medium text-charcoal mb-2">
-                          프로젝트 제목 *
-                        </label>
-                        <input
-                          type="text"
-                          value={title}
-                          onChange={(e) => setTitle(e.target.value)}
-                          placeholder="예: Q4 사업 성과 발표"
-                          className="w-full px-4 py-3 rounded-xl border border-border bg-cream focus:outline-none focus:ring-2 focus:ring-coral"
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-charcoal mb-2">
+                            프로젝트 제목 *
+                          </label>
+                          <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="예: Q4 사업 성과 발표"
+                            className="w-full px-4 py-3 rounded-xl border border-border bg-cream focus:outline-none focus:ring-2 focus:ring-coral"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-charcoal mb-2">
+                            발표 예정일 (선택)
+                          </label>
+                          <input
+                            type="date"
+                            value={targetDate}
+                            onChange={(e) => setTargetDate(e.target.value)}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="w-full px-4 py-3 rounded-xl border border-border bg-cream focus:outline-none focus:ring-2 focus:ring-coral"
+                          />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-charcoal mb-2">

@@ -5,12 +5,15 @@ import Link from 'next/link';
 import { Header } from '@/components/layout';
 import { Card } from '@/components/ui/card';
 import { useProjectStore } from '@/lib/stores/project-store';
+import { useUserStore } from '@/lib/stores/user-store';
 import { useAuth } from '@/lib/auth/hooks';
 import { getProjects } from '@/lib/supabase/projects';
+import { Button } from '@/components/ui/button';
 import type { Project } from '@/types';
 
 export default function StudioPage() {
   const { projects: localProjects, setProjects } = useProjectStore();
+  const { voiceClone } = useUserStore();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [dbProjects, setDbProjects] = useState<Project[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
@@ -65,25 +68,34 @@ export default function StudioPage() {
             </p>
           </div>
 
-          {/* Login Banner for Guests */}
-          {!authLoading && !isAuthenticated && (
-            <Card className="p-4 mb-8 bg-teal-light/20 border border-teal/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
+          {/* Voice Cloning CTA - 로그인 사용자이면서 음성 클론이 없을 때 */}
+          {!authLoading && isAuthenticated && voiceClone.status !== 'ready' && (
+            <Card className="p-5 mb-8 bg-gradient-to-r from-purple-50 to-teal-50 border border-teal/20 relative overflow-hidden">
+              {/* 배경 장식 */}
+              <div className="absolute -right-8 -top-8 w-32 h-32 bg-teal/5 rounded-full" />
+              <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-purple-500/5 rounded-full" />
+
+              <div className="relative flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center flex-shrink-0 shadow-lg">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-white">
+                    <path d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z" fill="currentColor" />
+                    <path d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z" fill="currentColor" />
                   </svg>
-                  <div>
-                    <p className="text-sm font-medium text-teal-dark">면접/발표 연습을 저장하려면 로그인하세요</p>
-                    <p className="text-xs text-gray-warm">성장 추적, 맞춤 피드백, 여러 기기에서 연습 가능</p>
-                  </div>
                 </div>
-                <Link
-                  href="/login"
-                  className="px-4 py-2 bg-teal text-white text-sm font-medium rounded-lg hover:bg-teal-dark transition-colors"
-                >
-                  로그인
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs px-2 py-0.5 bg-teal/10 text-teal rounded-full font-medium">NEW</span>
+                    <h3 className="font-bold text-charcoal">나의 목소리로 피드백 듣기</h3>
+                  </div>
+                  <p className="text-sm text-gray-warm">
+                    AI가 개선한 스피치를 <strong className="text-teal">내 목소리</strong>로 들어보세요!
+                    30초 샘플만 녹음하면 됩니다.
+                  </p>
+                </div>
+                <Link href="/my?tab=settings">
+                  <Button className="bg-teal hover:bg-teal-dark whitespace-nowrap shadow-lg shadow-teal/20">
+                    🎤 음성 등록하기
+                  </Button>
                 </Link>
               </div>
             </Card>
@@ -133,7 +145,22 @@ export default function StudioPage() {
 
           {/* New Project Section */}
           <section className="mb-12">
-            <h2 className="text-lg font-semibold text-charcoal mb-4">새 프로젝트 만들기</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-charcoal">새 프로젝트 만들기</h2>
+              {/* Login badge for guests - placed near project cards */}
+              {!authLoading && !isAuthenticated && (
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal to-teal-dark text-white text-sm font-medium rounded-full hover:shadow-lg transition-all hover:-translate-y-0.5"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  로그인하고 시작하기
+                </Link>
+              )}
+            </div>
             <div className="grid md:grid-cols-2 gap-4">
               {/* 면접 프로젝트 */}
               <Link href="/studio/new?type=interview">
@@ -149,7 +176,7 @@ export default function StudioPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-charcoal">면접 프로젝트</h3>
                         {!isAuthenticated && (
-                          <span className="text-xs px-2 py-0.5 bg-teal-light/50 text-teal-dark rounded-full">로그인 필요</span>
+                          <span className="text-xs px-2 py-1 bg-teal text-white rounded-full font-medium animate-pulse">🔐 로그인 필요</span>
                         )}
                       </div>
                       <p className="text-sm text-gray-warm mb-3">
@@ -181,7 +208,7 @@ export default function StudioPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-charcoal">발표 프로젝트</h3>
                         {!isAuthenticated && (
-                          <span className="text-xs px-2 py-0.5 bg-coral-light/50 text-coral rounded-full">로그인 필요</span>
+                          <span className="text-xs px-2 py-1 bg-coral text-white rounded-full font-medium animate-pulse">🔐 로그인 필요</span>
                         )}
                       </div>
                       <p className="text-sm text-gray-warm mb-3">

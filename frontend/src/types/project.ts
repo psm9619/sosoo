@@ -62,6 +62,7 @@ export interface Project {
     achievements: string[];
   }[];
   contextStrengths?: string[]; // 강점
+  targetDate?: string; // 목표일 (면접/발표 예정일, YYYY-MM-DD)
   questions: Question[];
   createdAt: string;
   updatedAt: string;

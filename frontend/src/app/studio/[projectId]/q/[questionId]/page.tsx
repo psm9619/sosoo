@@ -15,6 +15,8 @@ import { getProjectById } from '@/lib/supabase/projects';
 import { createAttempt } from '@/lib/supabase/attempts';
 import { analyzeAudio, PROGRESS_MESSAGES, type AnalyzeResult } from '@/lib/api/analyze';
 import { INTERVIEW_CATEGORY_LABELS, type Attempt, type Project, type Question } from '@/types';
+import { BeforeAfterComparison } from '@/components/audio';
+import { useUserStore } from '@/lib/stores/user-store';
 
 type Step = 'ready' | 'recording' | 'processing' | 'result';
 
@@ -26,6 +28,7 @@ export default function QuestionRecordingPage() {
 
   const { projects: localProjects, addAttempt: addLocalAttempt } = useProjectStore();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { voiceClone } = useUserStore();
 
   const [project, setProject] = useState<Project | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
@@ -152,6 +155,7 @@ export default function QuestionRecordingPage() {
           mode: 'quick',
           projectType: project?.type,
           userId: isAuthenticated && user ? user.id : undefined,
+          useVoiceClone: voiceClone.status === 'ready', // 보이스 클론이 준비되면 사용
         },
         {
           onProgress: (progress) => {
@@ -475,36 +479,16 @@ export default function QuestionRecordingPage() {
                 <p className="text-gray-warm">이번 연습 점수: {currentAttempt.score}점</p>
               </div>
 
-              <div className="space-y-4 mb-8">
-                {/* 개선 버전 먼저 표시 (After-First UX) */}
-                <Card className="p-6 bg-teal-light/20 border border-teal/20">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-teal uppercase">개선 버전</span>
-                  </div>
-                  <p className="text-charcoal mb-4 leading-relaxed">
-                    {currentAttempt.improvedText}
-                  </p>
-                  {currentAttempt.improvedAudioUrl && (
-                    <audio controls className="w-full" src={currentAttempt.improvedAudioUrl}>
-                      <track kind="captions" />
-                    </audio>
-                  )}
-                </Card>
-
-                <Card className="p-6 bg-warm-white border-none">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-gray-soft uppercase">원본</span>
-                    <span className="text-sm text-gray-soft">{formatDuration(currentAttempt.duration)}</span>
-                  </div>
-                  <p className="text-charcoal/70 mb-4 leading-relaxed">
-                    {currentAttempt.originalText}
-                  </p>
-                  {(currentAttempt.originalAudioUrl || audioUrl) && (
-                    <audio controls className="w-full" src={currentAttempt.originalAudioUrl || audioUrl || undefined}>
-                      <track kind="captions" />
-                    </audio>
-                  )}
-                </Card>
+              {/* Before/After Comparison */}
+              <div className="mb-8">
+                <BeforeAfterComparison
+                  originalText={currentAttempt.originalText}
+                  improvedText={currentAttempt.improvedText}
+                  originalAudioUrl={currentAttempt.originalAudioUrl || audioUrl || undefined}
+                  improvedAudioUrl={currentAttempt.improvedAudioUrl}
+                  duration={currentAttempt.duration}
+                  formatDuration={formatDuration}
+                />
               </div>
 
               <Card className="p-4 bg-warm-white border-none mb-8">
@@ -520,6 +504,33 @@ export default function QuestionRecordingPage() {
                   ))}
                 </div>
               </Card>
+
+              {/* Voice Cloning CTA - 로그인 사용자이면서 음성 클론이 없을 때 */}
+              {isAuthenticated && voiceClone.status !== 'ready' && (
+                <Card className="p-5 mb-8 bg-gradient-to-r from-teal/5 to-teal/10 border border-teal/20">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-teal/10 flex items-center justify-center flex-shrink-0">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-teal">
+                        <path d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z" fill="currentColor" />
+                        <path d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z" fill="currentColor" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-charcoal mb-1">
+                        🎯 나의 목소리로 개선본을 들어보세요!
+                      </h4>
+                      <p className="text-sm text-gray-warm">
+                        30초 샘플 녹음만으로 AI가 내 목소리로 개선된 버전을 들려드려요.
+                      </p>
+                    </div>
+                    <Link href="/my?tab=settings">
+                      <Button className="bg-teal hover:bg-teal-dark whitespace-nowrap">
+                        음성 등록하기
+                      </Button>
+                    </Link>
+                  </div>
+                </Card>
+              )}
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button onClick={handleRetry} variant="outline" className="flex-1 py-6">

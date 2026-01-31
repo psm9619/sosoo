@@ -12,12 +12,21 @@
 
 import { NextRequest } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
+import { createClient } from '@supabase/supabase-js';
 import { streamSpeechCoachWorkflow } from '@/lib/ai';
 import { extractLongTermMemory } from '@/lib/ai/nodes/progressive-context';
 import type { ProgressiveContext } from '@/lib/ai/nodes/progressive-context';
 import type { AnalyzeRequest } from '@/types/api';
 import { getProjectById } from '@/lib/supabase/projects';
 import { analyzeGrowthPatterns } from '@/lib/supabase/attempts';
+
+// Supabase Admin 클라이언트
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // Edge Runtime for streaming
 export const runtime = 'nodejs';
@@ -117,12 +126,42 @@ export async function POST(request: NextRequest) {
             )
           );
 
+          // 사용자의 Voice Clone ID 조회 (voiceType이 'cloned'인 경우)
+          let voiceCloneId: string | undefined;
+          let finalVoiceType = body.voiceType || 'default_male';
+
+          if (body.userId && (body.voiceType === 'cloned' || body.useVoiceClone)) {
+            try {
+              const supabaseAdmin = getSupabaseAdmin();
+              const { data: voiceClone } = await supabaseAdmin
+                .from('voice_clones')
+                .select('elevenlabs_voice_id')
+                .eq('user_id', body.userId)
+                .eq('status', 'ready')
+                .single();
+
+              if (voiceClone?.elevenlabs_voice_id) {
+                voiceCloneId = voiceClone.elevenlabs_voice_id;
+                finalVoiceType = 'cloned';
+                console.log('[analyze] Using voice clone:', voiceCloneId);
+              } else {
+                // 클론이 없으면 기본 음성 사용
+                finalVoiceType = 'default_male';
+                console.log('[analyze] No voice clone found, using default');
+              }
+            } catch (error) {
+              console.error('[analyze] Failed to fetch voice clone:', error);
+              finalVoiceType = 'default_male';
+            }
+          }
+
           // 워크플로우 스트리밍 실행
           const workflow = streamSpeechCoachWorkflow({
             sessionId,
             audioUrl: body.audioUrl,
             mode: body.mode || 'quick',
-            voiceType: body.voiceType || 'default_male',
+            voiceType: finalVoiceType,
+            voiceCloneId,
             question: body.question || undefined,
             projectId: body.projectId || undefined,
             projectType: body.projectType || undefined,

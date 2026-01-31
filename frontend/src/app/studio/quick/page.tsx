@@ -8,8 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { VoiceWave } from '@/components/home';
+import { RefinementPanel } from '@/components/feedback';
+import { AudioUpload, BeforeAfterComparison } from '@/components/audio';
 import { useAudioRecorder } from '@/hooks';
 import { analyzeAudio, PROGRESS_MESSAGES, type AnalyzeResult } from '@/lib/api/analyze';
+import { useUserStore } from '@/lib/stores/user-store';
+
+type InputMode = 'record' | 'upload';
 
 // 기본 면접 질문들
 const DEFAULT_INTERVIEW_QUESTIONS = [
@@ -26,6 +31,7 @@ function QuickStudioContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const type = searchParams.get('type') || 'interview';
+  const { voiceClone } = useUserStore();
 
   const [step, setStep] = useState<Step>(type === 'free_speech' ? 'ready' : 'select');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -33,6 +39,11 @@ function QuickStudioContent() {
   const [progressMessage, setProgressMessage] = useState('');
   const [analysisResult, setAnalysisResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refinementCount, setRefinementCount] = useState(0);
+  const [isRefinementOpen, setIsRefinementOpen] = useState(false);
+  const [inputMode, setInputMode] = useState<InputMode>('record');
+  const [uploadedBlob, setUploadedBlob] = useState<Blob | null>(null);
+  const [uploadedDuration, setUploadedDuration] = useState(0);
 
   const {
     isRecording,
@@ -86,12 +97,27 @@ function QuickStudioContent() {
     setProgressMessage(PROGRESS_MESSAGES.start);
   }, [stop]);
 
+  // 업로드 파일 선택 핸들러
+  const handleFileSelected = useCallback((file: File, fileAudioUrl: string, fileDuration: number) => {
+    // File을 Blob으로 변환
+    setUploadedBlob(file);
+    setUploadedDuration(fileDuration);
+    setStep('processing');
+    setError(null);
+    setProcessingProgress(0);
+    setProgressMessage(PROGRESS_MESSAGES.start);
+  }, []);
+
   // audioBlob이 생성되면 분석 시작
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // 분석에 사용할 Blob (녹음 또는 업로드)
+  const activeBlob = inputMode === 'record' ? audioBlob : uploadedBlob;
+  const activeDuration = inputMode === 'record' ? duration : uploadedDuration;
+
   useEffect(() => {
-    // 이미 분석 중이거나, processing 상태가 아니거나, audioBlob이 없으면 스킵
-    if (isAnalyzing || step !== 'processing' || !audioBlob) return;
+    // 이미 분석 중이거나, processing 상태가 아니거나, blob이 없으면 스킵
+    if (isAnalyzing || step !== 'processing' || !activeBlob) return;
 
     const runAnalysis = async () => {
       setIsAnalyzing(true);
@@ -99,10 +125,11 @@ function QuickStudioContent() {
       try {
         await analyzeAudio(
           {
-            audioBlob,
+            audioBlob: activeBlob,
             question: currentQuestion || undefined,
             mode: 'quick',
             projectType: type === 'free_speech' ? 'free_speech' : 'interview',
+            useVoiceClone: voiceClone.status === 'ready', // 보이스 클론이 준비되면 사용
           },
           {
             onProgress: (progress) => {
@@ -134,7 +161,7 @@ function QuickStudioContent() {
     };
 
     runAnalysis();
-  }, [step, audioBlob, currentQuestion, isAnalyzing]);
+  }, [step, activeBlob, currentQuestion, isAnalyzing, type]);
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < DEFAULT_INTERVIEW_QUESTIONS.length - 1) {
@@ -157,7 +184,24 @@ function QuickStudioContent() {
     setAnalysisResult(null);
     setError(null);
     setIsAnalyzing(false);
+    setRefinementCount(0);
+    setIsRefinementOpen(false);
+    setUploadedBlob(null);
+    setUploadedDuration(0);
   };
+
+  // 재생성 완료 핸들러
+  const handleRefinementComplete = useCallback((newScript: string, newAudioUrl: string) => {
+    if (analysisResult) {
+      setAnalysisResult({
+        ...analysisResult,
+        improvedScript: newScript,
+        improvedAudioUrl: newAudioUrl,
+      });
+    }
+    setRefinementCount((prev) => prev + 1);
+    setIsRefinementOpen(false);
+  }, [analysisResult]);
 
   return (
     <div className="min-h-screen flex flex-col bg-cream">
@@ -251,17 +295,68 @@ function QuickStudioContent() {
                 </div>
               )}
 
-              <button
-                onClick={handleStartRecording}
-                className="w-32 h-32 rounded-full bg-gradient-to-br from-coral to-coral/80 text-white shadow-xl shadow-coral/30 hover:shadow-2xl hover:shadow-coral/40 hover:scale-105 transition-all flex items-center justify-center mx-auto mb-6"
-              >
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z" />
-                  <path d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z" />
-                </svg>
-              </button>
+              {/* 입력 모드 탭 */}
+              <div className="flex justify-center gap-2 mb-6">
+                <button
+                  onClick={() => setInputMode('record')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    inputMode === 'record'
+                      ? 'bg-teal text-white'
+                      : 'bg-secondary text-gray-warm hover:bg-secondary/80'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z" />
+                      <path d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z" />
+                    </svg>
+                    녹음하기
+                  </span>
+                </button>
+                <button
+                  onClick={() => setInputMode('upload')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    inputMode === 'upload'
+                      ? 'bg-teal text-white'
+                      : 'bg-secondary text-gray-warm hover:bg-secondary/80'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    파일 업로드
+                  </span>
+                </button>
+              </div>
 
-              <p className="text-sm text-gray-soft">버튼을 눌러 녹음을 시작하세요</p>
+              {/* 녹음 모드 */}
+              {inputMode === 'record' && (
+                <>
+                  <button
+                    onClick={handleStartRecording}
+                    className="w-32 h-32 rounded-full bg-gradient-to-br from-coral to-coral/80 text-white shadow-xl shadow-coral/30 hover:shadow-2xl hover:shadow-coral/40 hover:scale-105 transition-all flex items-center justify-center mx-auto mb-6"
+                  >
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z" />
+                      <path d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z" />
+                    </svg>
+                  </button>
+                  <p className="text-sm text-gray-soft">버튼을 눌러 녹음을 시작하세요</p>
+                </>
+              )}
+
+              {/* 업로드 모드 */}
+              {inputMode === 'upload' && (
+                <div className="text-left">
+                  <AudioUpload
+                    onFileSelected={handleFileSelected}
+                    onCancel={() => setInputMode('record')}
+                  />
+                </div>
+              )}
 
               {type === 'interview' && (
                 <button
@@ -380,39 +475,48 @@ function QuickStudioContent() {
                 </Card>
               )}
 
-              {/* After-First UX: 개선 버전을 먼저 보여줌 */}
-              <div className="space-y-4 mb-8">
-                <Card className="p-6 bg-teal-light/20 border border-teal/20">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-teal uppercase">개선 버전</span>
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal/10 text-teal text-xs rounded-full">
-                      ✨ 나와 같은 목소리
-                    </span>
-                  </div>
-                  <p className="text-charcoal mb-4 leading-relaxed">
-                    {analysisResult.improvedScript}
-                  </p>
-                  {analysisResult.improvedAudioUrl && (
-                    <audio controls className="w-full" src={analysisResult.improvedAudioUrl}>
-                      <track kind="captions" />
-                    </audio>
-                  )}
-                </Card>
+              {/* Refinement Button */}
+              {refinementCount < 3 && !isRefinementOpen && (
+                <div className="flex justify-center mb-4">
+                  <button
+                    onClick={() => setIsRefinementOpen(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-warm hover:text-teal hover:bg-teal/10 border border-gray-soft/30 rounded-full transition-colors"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    다시 생성 ({3 - refinementCount}회 남음)
+                  </button>
+                </div>
+              )}
 
-                <Card className="p-6 bg-warm-white border-none">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-gray-soft uppercase">원본</span>
-                    <span className="text-sm text-gray-soft">{formatDuration(duration)}</span>
-                  </div>
-                  <p className="text-charcoal/70 mb-4 leading-relaxed">
-                    {analysisResult.transcript}
-                  </p>
-                  {audioUrl && (
-                    <audio controls className="w-full" src={audioUrl} preload="metadata">
-                      <track kind="captions" />
-                    </audio>
-                  )}
-                </Card>
+              {/* Refinement Panel */}
+              {isRefinementOpen && analysisResult.analysisResult && (
+                <div className="mb-6">
+                  <RefinementPanel
+                    sessionId={analysisResult.sessionId}
+                    originalTranscript={analysisResult.transcript}
+                    currentScript={analysisResult.improvedScript}
+                    analysisResult={analysisResult.analysisResult}
+                    refinementCount={refinementCount}
+                    maxRefinements={3}
+                    onRefinementComplete={handleRefinementComplete}
+                    onClose={() => setIsRefinementOpen(false)}
+                  />
+                </div>
+              )}
+
+              {/* Before/After Comparison */}
+              <div className="mb-8">
+                <BeforeAfterComparison
+                  originalText={analysisResult.transcript}
+                  improvedText={analysisResult.improvedScript}
+                  originalAudioUrl={audioUrl || undefined}
+                  improvedAudioUrl={analysisResult.improvedAudioUrl}
+                  duration={activeDuration}
+                  formatDuration={formatDuration}
+                />
               </div>
 
               {/* Priority Ranking (자유스피치 전용) */}

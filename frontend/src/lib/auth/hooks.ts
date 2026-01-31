@@ -9,7 +9,7 @@ import type { AuthState, AuthProvider } from './types';
  * 인증 상태 관리 훅
  */
 export function useAuth(): AuthState & {
-  signInWithOAuth: (provider: AuthProvider) => Promise<void>;
+  signInWithOAuth: (provider: AuthProvider, returnUrl?: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: string | null; needsVerification?: boolean }>;
   signOut: () => Promise<void>;
@@ -40,10 +40,13 @@ export function useAuth(): AuthState & {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signInWithOAuth = useCallback(async (provider: AuthProvider) => {
+  const signInWithOAuth = useCallback(async (provider: AuthProvider, returnUrl?: string) => {
     const supabase = createClient();
 
-    const redirectTo = `${window.location.origin}/auth/callback`;
+    // returnUrl이 없으면 현재 URL의 next 파라미터 또는 /studio 사용
+    const urlParams = new URLSearchParams(window.location.search);
+    const next = returnUrl || urlParams.get('next') || '/studio';
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
     await supabase.auth.signInWithOAuth({
       provider: provider as 'google', // kakao는 OIDC로 설정 후 사용
