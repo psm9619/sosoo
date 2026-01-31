@@ -13,10 +13,10 @@ export function SamplePreview() {
         {/* Section Header */}
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-charcoal mb-4">
-            직접 <span className="text-coral">비교</span>해보세요
+            Before & <span className="text-coral">After</span>
           </h2>
-          <p className="text-gray-warm text-lg">
-            같은 내용이 얼마나 달라지는지 들어보세요.
+          <p className="text-gray-warm">
+            개선된 버전을 <span className="text-teal font-medium">내 목소리</span>로 들어보세요
           </p>
         </div>
 
@@ -103,7 +103,7 @@ export function SamplePreview() {
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M8 5v14l11-7z" />
                   </svg>
-                  개선된 버전 듣기
+                  내 목소리로 듣기
                 </Button>
                 <span className="text-sm text-teal font-medium">0:08</span>
               </div>

@@ -1,19 +1,14 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Pretendard 폰트 */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
-
-/* Playfair Display */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap');
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-display: "Playfair Display", Georgia, serif;
+  --font-sans: var(--font-sans), -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-serif-kr: var(--font-serif-kr), Georgia, serif;
+  --font-serif-en: var(--font-serif-en), Georgia, serif;
   --font-mono: var(--font-geist-mono);
 
   /* VoiceUp Custom Colors */
@@ -142,14 +137,29 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   }
 }
 
 /* Custom Utility Classes */
 @layer utilities {
+  /* 로고용 (Gowun Dodum) */
+  .font-logo {
+    font-family: var(--font-logo), -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+
+  /* 한글 세리프 포인트 (Gowun Batang) */
+  .font-serif-kr {
+    font-family: var(--font-serif-kr), Georgia, serif;
+  }
+
+  /* 영문 세리프 포인트 (Playfair Display) */
+  .font-serif-en {
+    font-family: var(--font-serif-en), Georgia, serif;
+  }
+
+  /* 레거시 호환 - font-display는 font-serif-kr 사용 */
   .font-display {
-    font-family: "Playfair Display", Georgia, serif;
+    font-family: var(--font-serif-kr), Georgia, serif;
   }
 
   .text-gradient {
@@ -213,9 +223,32 @@
   animation: float 4s ease-in-out infinite;
 }
 
+/* Fade in animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
 /* Staggered animation delays */
 .delay-100 { animation-delay: 100ms; }
 .delay-200 { animation-delay: 200ms; }
 .delay-300 { animation-delay: 300ms; }
 .delay-400 { animation-delay: 400ms; }
 .delay-500 { animation-delay: 500ms; }
+
+/* Alternative naming for animation delays */
+.animation-delay-100 { animation-delay: 100ms; }
+.animation-delay-200 { animation-delay: 200ms; }
+.animation-delay-300 { animation-delay: 300ms; }
+.animation-delay-400 { animation-delay: 400ms; }
+.animation-delay-500 { animation-delay: 500ms; }

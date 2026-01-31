@@ -8,6 +8,25 @@ interface UseAudioRecorderOptions {
   onMaxDurationReached?: () => void;
 }
 
+// 브라우저가 지원하는 오디오 MIME 타입 감지 (Safari 호환성)
+function getSupportedMimeType(): string {
+  const types = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/ogg;codecs=opus',
+    'audio/ogg',
+  ];
+
+  for (const type of types) {
+    if (MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+
+  return ''; // 브라우저 기본값 사용
+}
+
 export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
   const { maxDuration = 300, onMaxDurationReached } = options;
 
@@ -55,6 +74,14 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
 
   // 녹음 시작
   const start = useCallback(async () => {
+    // 브라우저 지원 체크
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('이 브라우저는 마이크 접근을 지원하지 않습니다.');
+    }
+    if (typeof MediaRecorder === 'undefined') {
+      throw new Error('이 브라우저는 녹음 기능을 지원하지 않습니다.');
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -67,9 +94,9 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       streamRef.current = stream;
       chunksRef.current = [];
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
-      });
+      // Safari 호환성을 위한 MIME 타입 감지
+      const mimeType = getSupportedMimeType();
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -78,7 +105,8 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        // MediaRecorder가 사용한 실제 MIME 타입 사용
+        const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
         setStopRecording(blob);
         stopTimer();
 
