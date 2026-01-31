@@ -66,6 +66,46 @@ const useCases = [
   },
 ];
 
+// 현실적 기대효과
+const expectedBenefits = [
+  {
+    title: '객관적인 피드백',
+    problem: '친구나 가족에게 피드백을 부탁하면 예의상 "괜찮아"라는 말만 듣기 쉽습니다.',
+    solution: 'AI는 감정 없이 솔직하게 개선점을 짚어줍니다. 실제로 뭐가 부족한지 알 수 있어요.',
+    icon: '🎯',
+  },
+  {
+    title: '내 상황에 맞는 질문',
+    problem: '인터넷 "면접 예상 질문"은 범용적이라 내 상황과 맞지 않습니다.',
+    solution: '이력서/발표자료를 분석해 "이 프로젝트에서 가장 어려웠던 점은?" 같은 맞춤 질문을 생성합니다.',
+    icon: '📋',
+  },
+  {
+    title: '컨텍스트 기반 답변 분석',
+    problem: '일반 분석은 "구체성이 부족해요"라는 추상적 피드백만 줍니다.',
+    solution: '내 이력서를 알기에 "OO 프로젝트의 성과 수치를 언급하면 더 설득력 있어요"처럼 맞춤 조언을 제공합니다.',
+    icon: '🔍',
+  },
+  {
+    title: '"나도 할 수 있다"는 자신감',
+    problem: '다른 사람의 발표를 보면 "저 사람이니까 가능하지"라고 생각하기 쉽습니다.',
+    solution: '내 목소리로 개선된 버전을 들으면 "나도 이렇게 말할 수 있구나"를 직접 체감합니다.',
+    icon: '💪',
+  },
+  {
+    title: '막연한 불안 → 구체적 준비',
+    problem: '면접 전날, "잘할 수 있을까?" 막연한 걱정만 반복됩니다.',
+    solution: '"전달력은 좋으니 내용 구체성만 보완하면 돼"처럼 명확한 액션 아이템을 얻습니다.',
+    icon: '✅',
+  },
+  {
+    title: '성장의 연속성',
+    problem: '다른 앱들은 매번 처음부터 시작. 어제 받은 피드백을 기억 못 합니다.',
+    solution: 'AI가 이전 연습을 기억하고 "저번보다 속도가 좋아졌어요"처럼 성장을 인정해줍니다.',
+    icon: '🔄',
+  },
+];
+
 export default function AboutPage() {
   return (
     <div className="min-h-screen flex flex-col">
@@ -172,6 +212,38 @@ export default function AboutPage() {
                   <p className="text-gray-warm text-sm">
                     {useCase.description}
                   </p>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Expected Benefits - 현실적 기대효과 */}
+        <section className="py-20 px-6 bg-cream">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl font-bold text-charcoal text-center mb-4">
+              실제로 어떤 변화가 있을까요?
+            </h2>
+            <p className="text-gray-warm text-center mb-12">
+              VoiceUp 사용 전/후의 현실적인 차이를 비교해보세요.
+            </p>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {expectedBenefits.map((benefit, index) => (
+                <Card key={index} className="p-6 bg-warm-white border-none hover:shadow-lg transition-shadow">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-2xl">{benefit.icon}</span>
+                    <h3 className="text-lg font-semibold text-charcoal">{benefit.title}</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-coral-light/20 rounded-lg">
+                      <p className="text-xs font-medium text-coral mb-1">😣 기존 방식</p>
+                      <p className="text-sm text-gray-warm">{benefit.problem}</p>
+                    </div>
+                    <div className="p-3 bg-teal-light/30 rounded-lg">
+                      <p className="text-xs font-medium text-teal mb-1">✨ VoiceUp 사용 시</p>
+                      <p className="text-sm text-charcoal">{benefit.solution}</p>
+                    </div>
+                  </div>
                 </Card>
               ))}
             </div>
