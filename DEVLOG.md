@@ -1296,4 +1296,267 @@ src/
 
 ---
 
+---
+
+## 2026-02-01 (오후): 프로덕션 버그 수정 및 모바일 UI 개선
+
+### 📋 개요
+
+프로덕션 배포 후 발견된 여러 버그를 수정하고, 모바일 UI/UX를 개선했습니다.
+
+### ✅ 완료된 작업
+
+| 카테고리 | 작업 | 상태 |
+|----------|------|------|
+| **버그 수정** | pdfjs-dist DOMMatrix 에러 | ✅ |
+| **버그 수정** | 컨텍스트 분석 API 동적 import | ✅ |
+| **버그 수정** | 모바일 로그아웃 에러 | ✅ |
+| **UI 개선** | 모바일 햄버거 메뉴 추가 | ✅ |
+| **UI 개선** | 카테고리 피드백 클릭 가능 UI | ✅ |
+| **UI 개선** | About 페이지 기대효과 섹션 | ✅ |
+| **문서화** | 브랜드 가이드 업데이트 | ✅ |
+
+---
+
+### 1. pdfjs-dist DOMMatrix 에러 수정 (🔴 Critical)
+
+#### 문제
+```
+ReferenceError: DOMMatrix is not defined
+    at node_modules/pdfjs-dist/build/pdf.mjs
+```
+
+프로덕션 서버리스 환경에서 pdfjs-dist가 브라우저 API(DOMMatrix)를 요구하여 에러 발생.
+
+#### 원인
+- `pdf-parse` 라이브러리가 내부적으로 `pdfjs-dist` 사용
+- 정적 import 시 서버리스 함수 로드 시점에 pdfjs-dist도 함께 로드
+- 컨텍스트 분석이 필요 없는 `/api/analyze` 등에서도 불필요하게 로드
+
+#### 해결
+
+**1단계: `lib/ai/nodes/context.ts` 동적 import**
+```typescript
+// 정적 import (X)
+import { PDFParse } from 'pdf-parse';
+import * as mammoth from 'mammoth';
+
+// 동적 import (O)
+async function parsePdf(buffer: Buffer): Promise<{ text: string }> {
+  const { PDFParse } = await import('pdf-parse');
+  const pdf = new PDFParse({ data: new Uint8Array(buffer) });
+  const result = await pdf.getText();
+  return { text: result.text };
+}
+
+async function parseDocx(buffer: Buffer): Promise<string> {
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  return result.value;
+}
+```
+
+**2단계: `/api/context/analyze/route.ts` 정리**
+```typescript
+// 정적 import 제거, 공유 함수 사용
+import { analyzeContext, extractTextFromDocument, extractTextFromFile } from '@/lib/ai/nodes';
+```
+
+#### 영향 범위
+- `pdf-parse`/`mammoth`는 `/api/context/analyze` 호출 시에만 로드
+- 다른 API routes (`/api/analyze`, `/api/refine`, `/api/questions/generate`)에 영향 없음
+
+---
+
+### 2. 컨텍스트 기반 프로젝트 질문 생성 수정
+
+#### 문제
+컨텍스트 자료(PDF/DOCX) 업로드 후에도 기본 3개 질문만 표시되는 문제.
+
+#### 원인
+`/api/context/analyze/route.ts`에서 정적 import로 인해 API 호출 자체가 실패 → `contextAnalysis = null` → 질문 생성 스킵 → 기본 질문 fallback
+
+#### 해결
+동적 import 적용으로 컨텍스트 분석 API 정상 동작 → 맞춤 질문 생성
+
+#### 검증된 호환성
+
+| 프로젝트 타입 | 컨텍스트 분석 | 질문 생성 | 스피치 분석 |
+|--------------|-------------|----------|-----------|
+| `interview` (컨텍스트 O) | ✅ | ✅ 맞춤 14개 | ✅ |
+| `interview` (컨텍스트 X) | - | ✅ 기본 3개 | ✅ |
+| `presentation` | ✅ | ✅ Q&A 질문 | ✅ |
+| `free_speech` | - | - | ✅ |
+
+---
+
+### 3. 모바일 UI 개선
+
+#### 3.1 햄버거 메뉴 추가
+
+**파일**: `components/layout/header.tsx`
+
+```typescript
+const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+// 햄버거 버튼 (md:hidden)
+<button onClick={() => setShowMobileMenu(!showMobileMenu)} className="md:hidden">
+  {showMobileMenu ? <X /> : <Menu />}
+</button>
+
+// 모바일 메뉴 드로어
+{showMobileMenu && (
+  <div className="fixed top-16 left-0 right-0 bg-warm-white md:hidden">
+    <nav>{navItems.map(...)}</nav>
+    {isAuthenticated ? (<마이페이지, 로그아웃>) : (<로그인>)}
+  </div>
+)}
+```
+
+#### 3.2 데스크톱 전용 Auth 영역
+
+게스트 상태에서 모바일에 빈 아바타 원이 표시되는 문제 수정:
+```typescript
+// 데스크톱에서만 아바타/로그인 버튼 표시
+<div className="hidden md:block">
+  {isLoading ? (...) : isAuthenticated ? (<Avatar />) : (<로그인 버튼>)}
+</div>
+```
+
+#### 3.3 로그아웃 에러 처리
+
+**파일**: `lib/auth/hooks.ts`
+
+```typescript
+const signOut = useCallback(async () => {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error('Sign out error:', error);
+    // 항상 로컬 상태 초기화
+    setUser(null);
+    setSession(null);
+  } catch (error) {
+    console.error('Sign out exception:', error);
+    // 에러가 나도 상태 초기화
+    setUser(null);
+    setSession(null);
+  }
+}, []);
+```
+
+---
+
+### 4. 카테고리 피드백 UI 개선
+
+**파일**: `components/feedback/CategoryFeedbackView.tsx`
+
+#### 변경 사항
+1. 클릭 가능한 버튼 스타일 추가
+2. 펼침/접힘 상태 표시 (chevron 아이콘)
+3. "자세히 →" / "접기 ↑" 힌트 텍스트
+4. 폰트 크기 조정 (요약 텍스트 축소)
+
+```typescript
+<button className={`p-3 sm:p-4 rounded-xl border cursor-pointer group ...`}>
+  <div className="flex items-center justify-between">
+    <span>{config.icon} {config.label}</span>
+    <svg className={isExpanded ? 'rotate-180' : ''}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  </div>
+  <p className="text-xs sm:text-sm">{category.label}</p>
+  <p className="text-[10px] sm:text-xs">
+    {isExpanded ? '접기 ↑' : '자세히 →'}
+  </p>
+</button>
+```
+
+---
+
+### 5. About 페이지 기대효과 섹션
+
+**파일**: `app/about/page.tsx`
+
+#### 추가된 콘텐츠
+
+```typescript
+const expectedBenefits = [
+  {
+    title: '객관적인 피드백',
+    problem: '친구나 가족에게 피드백을 부탁하면 예의상 "괜찮아"...',
+    solution: 'AI는 감정 없이 솔직하게 개선점을 짚어줍니다.',
+    icon: '🎯',
+  },
+  {
+    title: '내 상황에 맞는 질문',
+    problem: '인터넷 "면접 예상 질문"은 범용적...',
+    solution: '이력서/발표자료를 분석해 맞춤 질문 생성',
+    icon: '📋',
+  },
+  // ... 6개 기대효과
+];
+```
+
+**UI**: 문제/해결 비교 카드 형식으로 표시
+
+---
+
+### 6. 브랜드 가이드 업데이트
+
+**파일**: `docs/brand/brand-guide.md`
+
+#### 추가 섹션
+- **4. 현실적 기대효과 (Expected Benefits)**
+  - 객관적인 피드백
+  - 내 상황에 맞는 질문 (Context-Based Questions)
+  - 컨텍스트 기반 답변 분석
+  - "나도 할 수 있다"는 자신감
+  - 막연한 불안 → 구체적 준비
+  - 성장의 연속성
+
+---
+
+### 수정된 파일 요약
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `lib/ai/nodes/context.ts` | 동적 import, extractTextFromFile 함수 추가 |
+| `lib/ai/nodes/index.ts` | extractTextFromFile export |
+| `app/api/context/analyze/route.ts` | 정적 import 제거, 공유 함수 사용 |
+| `components/layout/header.tsx` | 햄버거 메뉴, 데스크톱 전용 auth 영역 |
+| `lib/auth/hooks.ts` | signOut 에러 처리 강화 |
+| `components/feedback/CategoryFeedbackView.tsx` | 클릭 가능 UI |
+| `app/about/page.tsx` | 기대효과 섹션 추가 |
+| `docs/brand/brand-guide.md` | 기대효과 섹션 추가 |
+
+---
+
+### 코드 호환성 검증
+
+#### 동적 Import 영향 범위
+
+```
+pdf-parse / mammoth 사용 위치:
+└── lib/ai/nodes/context.ts (동적 import)
+    └── parsePdf()        - PDF 텍스트 추출
+    └── parseDocx()       - DOCX 텍스트 추출
+    └── extractTextFromFile()    - File 객체 처리
+    └── extractTextFromDocument() - URL 기반 처리
+
+호출 경로:
+/api/context/analyze
+  └── extractTextFromFile() (FormData)
+  └── extractTextFromDocument() (JSON/URL)
+  └── analyzeContext()
+
+영향 없는 API:
+- /api/analyze (스피치 분석) ✅
+- /api/refine (재생성) ✅
+- /api/questions/generate (질문 생성) ✅
+- /api/memory/build (메모리) ✅
+```
+
+---
+
 *Last updated: 2026-02-01*
