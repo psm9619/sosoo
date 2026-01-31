@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth/hooks';
 const ADMIN_EMAILS = [
   process.env.NEXT_PUBLIC_ADMIN_EMAIL,
   'soominp17@gmail.com',
+  'testvoiceup@gmail.com',
 ].filter(Boolean);
 
 interface UserSummary {

@@ -6,6 +6,7 @@ import { getAdminMetrics } from '@/lib/supabase/admin';
 const ADMIN_EMAILS = [
   process.env.ADMIN_EMAIL,
   'soominp17@gmail.com',
+  'testvoiceup@gmail.com',
 ].filter(Boolean);
 
 export async function GET() {
