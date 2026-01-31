@@ -130,41 +130,43 @@ export function Header() {
             )}
           </button>
 
-          {isLoading ? (
-            // 로딩 상태
-            <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
-          ) : isAuthenticated ? (
-            // 로그인된 상태
-            <div className="relative">
-              <button
-                onClick={() => setShowDropdown(!showDropdown)}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-              >
-                {/* 프로필 아바타 */}
-                {user?.user_metadata?.avatar_url ? (
-                  <img
-                    src={user.user_metadata.avatar_url}
-                    alt={userDisplayName}
-                    className="w-8 h-8 rounded-full object-cover border-2 border-teal"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center text-white text-sm font-medium">
-                    {userInitial}
-                  </div>
-                )}
-                {/* 드롭다운 화살표 */}
-                <svg
-                  className={cn(
-                    'w-4 h-4 text-gray-warm transition-transform',
-                    showDropdown && 'rotate-180'
-                  )}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+          {/* 데스크톱에서만 로그인/아바타 표시 (모바일은 햄버거 메뉴에서 처리) */}
+          <div className="hidden md:block">
+            {isLoading ? (
+              // 로딩 상태
+              <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+            ) : isAuthenticated ? (
+              // 로그인된 상태
+              <div className="relative">
+                <button
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+                  {/* 프로필 아바타 */}
+                  {user?.user_metadata?.avatar_url ? (
+                    <img
+                      src={user.user_metadata.avatar_url}
+                      alt={userDisplayName}
+                      className="w-8 h-8 rounded-full object-cover border-2 border-teal"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center text-white text-sm font-medium">
+                      {userInitial}
+                    </div>
+                  )}
+                  {/* 드롭다운 화살표 */}
+                  <svg
+                    className={cn(
+                      'w-4 h-4 text-gray-warm transition-transform',
+                      showDropdown && 'rotate-180'
+                    )}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
 
               {/* 드롭다운 메뉴 */}
               {showDropdown && (
@@ -226,14 +228,15 @@ export function Header() {
                 </>
               )}
             </div>
-          ) : (
-            // 비로그인 상태
-            <Link href="/login">
-              <Button size="sm" className="bg-teal hover:bg-teal-dark text-white">
-                로그인
-              </Button>
-            </Link>
-          )}
+            ) : (
+              // 비로그인 상태
+              <Link href="/login">
+                <Button size="sm" className="bg-teal hover:bg-teal-dark text-white">
+                  로그인
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
