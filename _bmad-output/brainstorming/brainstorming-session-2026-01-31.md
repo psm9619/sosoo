@@ -1,13 +1,13 @@
 ---
-stepsCompleted: [1, 2, 3]
+stepsCompleted: [1, 2, 3, 4]
 inputDocuments: []
 session_topic: 'AI Speech Coaching Service - Speaking analysis + improved version voice cloning'
 session_goals: 'Explore product concepts, features, user experience, and business viability for an AI that analyzes speech like a professional coach and demonstrates improvements using the users own cloned voice'
 selected_approach: 'Progressive Technique Flow'
 techniques_used: ['Role Playing', 'Six Thinking Hats', 'SCAMPER Method', 'Decision Tree Mapping']
-ideas_generated: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+ideas_generated: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
 context_file: ''
-current_phase: 3
+current_phase: 4
 ---
 
 # Brainstorming Session Results
@@ -362,13 +362,230 @@ current_phase: 3
 
 ### Phase 2 Summary
 
-**New Ideas Generated:** 4 (#19-22)
-**Total Ideas:** 22
+**New Ideas Generated:** 5 (#19-23)
+**Total Ideas:** 23
 **Key Decisions:**
 1. Voice cloning = optional, default voices provided
 2. Natural sample collection through practice flow
 3. ElevenLabs is cost bottleneck → mitigate with optional cloning
 4. Pricing model after MVP validation (subscription likely)
+5. Mode separation: Quick Practice vs Deep Practice
+
+---
+
+## Phase 3: SCAMPER - Idea Development (Streamlined)
+
+### Core Feature: "Audio Analysis → Improved Script → TTS Playback"
+
+| Lens | Question | Applied Idea |
+|------|----------|--------------|
+| **S**ubstitute | Replace Claude? | Keep Whisper + Claude combo (optimal) |
+| **C**ombine | What to merge? | Analysis + Improvement + Practice into **one-step flow** |
+| **A**dapt | From elsewhere? | YouTube Music lyrics UI → Script navigation |
+| **M**odify | Size/shape? | Auto-detect mode: Long presentation vs Short answer |
+| **P**ut to other uses | Other purposes? | Beyond interviews: Sales pitching, YouTube scripts, debate prep |
+| **E**liminate | What to remove? | MVP: Remove video analysis ✅, Remove real-time streaming |
+| **R**everse | Flip order? | After-First UX (improved version first) ✅ |
+
+### Phase 3 Key Decisions
+
+| Decision | Content |
+|----------|---------|
+| **MVP Scope** | Record → Analyze → Improved Script → TTS Playback |
+| **Removed Items** | Video analysis, real-time streaming, complex dashboard |
+| **Expansion Targets** | Non-interview use cases (sales, YouTube, etc.) - v2+ |
+| **UX Core** | After-First, one-step flow, auto mode detection |
+
+---
+
+## Phase 4: Decision Tree - MVP Implementation Path
+
+### MVP Implementation Priority
+
+```
+Priority 1 (Must Have)
+├── Audio recording UI
+├── Whisper STT integration
+├── Claude analysis (scorecard + improved script)
+├── ElevenLabs TTS (default M/F voices)
+└── Results screen (Before/After player)
+
+Priority 2 (Should Have)
+├── User authentication (simple login)
+├── History storage
+├── Practice mode (Listen-Record-Compare)
+└── Cloning option (offer after sample collection)
+
+Priority 3 (Nice to Have) - v1.1
+├── Context upload (Deep Mode)
+├── Mock interview question generation
+├── Quantitative dashboard (WPM, filler %)
+└── Question history/collection
+```
+
+### Tech Stack Decision
+
+| Area | Choice | Reason |
+|------|--------|--------|
+| **Frontend** | Next.js + React | Fast development, SSR |
+| **Backend** | Next.js API Routes or FastAPI | Easy LangGraph integration |
+| **STT** | OpenAI Whisper | Affordable, high quality |
+| **Analysis** | Claude Haiku | Cost efficient |
+| **TTS** | ElevenLabs | Cloning support |
+| **Storage** | S3 (audio) + PostgreSQL (meta) | Standard |
+| **Auth** | Supabase Auth or NextAuth | Fast implementation |
+
+### User Segmentation & Project-Based Structure
+
+#### Idea #24: User Segment-Based Branching
+- **Regular Practice User:** Job seekers practicing regularly (even without immediate interview)
+  - Needs: Gamification, level-up, streaks, growth graphs
+  - UX Tone: Achievement-focused, long-term progress
+  - Features: Badges, weekly streaks, growth tracking, AI coach's long-term feedback
+
+- **Urgent Performance User:** Has important interview/presentation THIS WEEK
+  - Needs: Quick wins, most effective combinations first
+  - UX Tone: Efficiency, priority-focused
+  - Features: D-Day countdown, "Top 3 improvements now", checklist, context upload emphasis
+
+#### Idea #25: Project-Based Data Structure
+- **Concept:** Users can create multiple projects for different purposes
+- **Examples:**
+  - "정기 스피치 연습" (Regular practice) - Regular mode
+  - "1/31 데이터분석가 면접 준비" (1/31 Data Analyst Interview) - Urgent mode, D-2
+  - "2/3 팀 발표 준비" (2/3 Team Presentation) - Urgent mode, D-5
+- **Features:**
+  - Each project has own mode, context, history
+  - Switch between projects anytime
+  - Project-level settings and tracking
+
+#### Onboarding Flow Update
+
+```
+START
+  │
+  ▼
+"What's your purpose?"
+  │
+  ├─► [Regular Practice] "I want to steadily improve my speech skills"
+  │      │
+  │      ▼
+  │    Create Project: "Regular Speech Practice"
+  │    → Gamification UI
+  │    → Growth tracking dashboard
+  │    → Level/XP system
+  │
+  └─► [Urgent Prep] "I have an important interview/presentation soon"
+         │
+         ▼
+       "When is it?" [Date picker]
+         │
+         ▼
+       Create Project: "1/31 OO Interview"
+       → D-Day countdown
+       → Context upload prompt
+       → "Key improvements" focused UI
+```
+
+#### Segment-Specific Features
+
+**Regular Practice User:**
+```
+✅ Level/XP system
+✅ Weekly streaks (consecutive practice days)
+✅ Growth graphs (WPM change, filler word reduction, etc.)
+✅ Badges/Achievements ("Filler Word Master", etc.)
+✅ AI Coach long-term feedback ("20% confidence increase vs last month")
+```
+
+**Urgent Performance User:**
+```
+✅ "Most effective 3 things now" instant suggestion
+✅ Context upload (resume, presentation) emphasis
+✅ Expected questions + template answers
+✅ D-Day countdown + checklist
+✅ "Fix this one thing for higher success rate" key point
+```
+
+### MVP Development Milestones
+
+```
+Week 1-2: Basic Flow
+├── Audio recording UI
+├── Whisper integration
+├── Claude analysis prompt development
+└── Basic results screen
+
+Week 3: TTS + Player
+├── ElevenLabs integration
+├── Before/After player
+└── After-First UX implementation
+
+Week 4: Polish
+├── User authentication
+├── History storage
+├── User segmentation onboarding
+├── Project management basic
+├── Bug fixes & testing
+└── Deployment
+```
+
+### Phase 4 Key Decisions
+
+| Decision | Content |
+|----------|---------|
+| **MVP Core** | Record → Analyze → Improved Script → TTS (4 weeks) |
+| **Tech Stack** | Next.js + Whisper + Claude Haiku + ElevenLabs |
+| **Auth** | Supabase Auth (simple) |
+| **User Segments** | Regular Practice vs Urgent Performance |
+| **Data Structure** | Project-based (multiple projects per user) |
+| **v1.1 Additions** | Deep Mode, Dashboard, Full Cloning |
+
+---
+
+## Final Summary
+
+### Total Ideas Generated: 25
+
+### Key Architectural Decisions
+
+1. **Voice Cloning:** Optional (default M/F voices provided)
+2. **User Segmentation:** Regular Practice vs Urgent Performance
+3. **Data Structure:** Project-based (users create projects per purpose)
+4. **Mode Structure:** Quick Practice vs Deep Practice (context-based)
+5. **MVP Input:** Audio only (video in v1.1)
+6. **Feedback Style:** Full scorecard + high-ROI combination recommendations
+7. **Onboarding:** Natural sample collection through practice
+
+### MVP Feature List
+
+| Priority | Feature | Status |
+|----------|---------|--------|
+| P1 | Audio recording | MVP |
+| P1 | Whisper STT | MVP |
+| P1 | Claude analysis + scorecard | MVP |
+| P1 | ElevenLabs TTS (default voices) | MVP |
+| P1 | Before/After player | MVP |
+| P1 | User segmentation onboarding | MVP |
+| P1 | Project management basic | MVP |
+| P2 | User auth | MVP |
+| P2 | History storage | MVP |
+| P2 | Practice mode | v1.1 |
+| P2 | Voice cloning option | v1.1 |
+| P3 | Context upload (Deep Mode) | v1.1 |
+| P3 | Mock interview questions | v1.1 |
+| P3 | Quantitative dashboard | v1.1 |
+
+### Tech Stack
+
+- **Frontend:** Next.js + React
+- **Backend:** Next.js API Routes / FastAPI
+- **STT:** OpenAI Whisper
+- **Analysis:** Claude Haiku
+- **TTS:** ElevenLabs
+- **Workflow:** LangGraph
+- **Storage:** S3 + PostgreSQL
+- **Auth:** Supabase Auth
 
 ---
 

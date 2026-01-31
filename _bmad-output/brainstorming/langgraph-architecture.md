@@ -579,12 +579,105 @@ if __name__ == "__main__":
 | `practice_loop` | Handle practice mode | - |
 | `compare_feedback` | Compare practice vs improved | Claude |
 
+## User Segmentation Flow (Added)
+
+```
+START
+  │
+  ▼
+┌─────────────────────┐
+│ Project Selection   │ ← Select existing or create new
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ User Segment Check  │ ← Regular Practice vs Urgent Performance
+└──────────┬──────────┘
+           │
+     ┌─────┴─────┐
+     ▼           ▼
+  Regular     Urgent
+   Mode        Mode
+     │           │
+     │           ├── D-Day countdown
+     │           ├── Context upload prompt
+     │           └── "Key improvements" focus
+     │
+     ├── Level/XP system
+     ├── Weekly streaks
+     ├── Growth graphs
+     └── Achievement badges
+           │
+           ▼
+    [Continue to Quick/Deep Mode Flow]
+```
+
+### Project-Based Structure
+
+```python
+class Project(TypedDict):
+    project_id: str
+    user_id: str
+    name: str  # e.g., "1/31 데이터분석가 면접"
+    segment: Literal["regular", "urgent"]
+    target_date: Optional[datetime]  # For urgent mode
+    context_documents: List[str]
+    sessions: List[str]  # Session IDs
+    settings: dict
+    created_at: datetime
+```
+
+### Segment-Specific UI Responses
+
+**Regular Mode Response:**
+```python
+{
+    "level": 12,
+    "xp": 2450,
+    "streak_days": 5,
+    "growth": {
+        "wpm_change": -15,  # Slower = better
+        "filler_reduction": 23  # % reduction
+    },
+    "achievements": ["Filler Master", "Week Warrior"]
+}
+```
+
+**Urgent Mode Response:**
+```python
+{
+    "d_day": 2,
+    "top_improvements": [
+        "Slow down pace by 10%",
+        "Use topic-first structure",
+        "Add specific numbers to achievements"
+    ],
+    "checklist": [
+        {"item": "Self-intro practice", "done": True},
+        {"item": "Technical questions", "done": False}
+    ],
+    "success_probability_boost": "+15% with these changes"
+}
+```
+
+---
+
 ## State Flow Summary
 
 ```
 START
   │
   ▼
+┌─────────────────┐
+│ Project Select  │ ← NEW: Select/Create Project
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ User Segment    │ ← NEW: Regular vs Urgent
+└────────┬────────┘
+         │
+         ▼
 ┌─────────────────┐
 │ Mode Selection  │
 └────────┬────────┘

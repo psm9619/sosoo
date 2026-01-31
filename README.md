@@ -32,9 +32,18 @@ AI 기반 스피치 코칭 서비스 - 말하기 분석 + 개선 버전 음성 �
 |----------|---------|
 | **Voice Cloning** | Optional (기본 남/녀 음성 제공) |
 | **Onboarding** | 연습하며 자연스럽게 샘플 수집 → 30초+ or 3회 연습 후 클로닝 제안 |
+| **User Segments** | Regular Practice (정기 연습) vs Urgent Performance (급한 성과) |
+| **Data Structure** | Project-based (프로젝트 단위로 관리) |
 | **Mode Structure** | Quick Practice vs Deep Practice (context-based) |
 | **MVP Input** | Audio only (영상은 v1.1 이후) |
 | **Pricing** | MVP 후 결정 (구독형 유력) |
+
+### User Segments
+
+| Segment | Description | Key Features |
+|---------|-------------|--------------|
+| **Regular Practice** | 정기적으로 스피치 연습하는 유저 | 레벨/XP, 스트릭, 성장 그래프, 배지 |
+| **Urgent Performance** | 당장 면접/발표가 있는 유저 | D-Day 카운트다운, 핵심 개선점, 체크리스트 |
 
 ## Tech Stack (Planned)
 
