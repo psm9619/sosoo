@@ -4,14 +4,20 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import * as mammoth from 'mammoth';
-import { PDFParse } from 'pdf-parse';
 
-// PDF 파일에서 텍스트 추출
+// PDF 파일에서 텍스트 추출 (동적 임포트로 서버리스 환경 호환)
 async function parsePdf(buffer: Buffer): Promise<{ text: string }> {
-  const pdf = new PDFParse({ data: new Uint8Array(buffer) });
-  const result = await pdf.getText();
-  return { text: result.text };
+  // pdf-parse를 동적으로 로드하여 analyze 라우트에서 불필요한 로드 방지
+  const pdfParse = (await import('pdf-parse')).default;
+  const data = await pdfParse(buffer);
+  return { text: data.text };
+}
+
+// DOCX 파일에서 텍스트 추출 (동적 임포트)
+async function parseDocx(buffer: Buffer): Promise<string> {
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  return result.value;
 }
 
 // Lazy-loaded Anthropic client
@@ -172,8 +178,7 @@ export async function extractTextFromDocument(
   ) {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const result = await mammoth.extractRawText({ buffer });
-    return result.value;
+    return parseDocx(buffer);
   }
 
   throw new Error(`${fileType} 파일 형식은 지원되지 않습니다. PDF, DOCX, 또는 텍스트 파일을 업로드해주세요.`);
