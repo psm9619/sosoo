@@ -45,16 +45,16 @@ export function CategoryFeedbackView({ feedback }: CategoryFeedbackViewProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 1. 한 줄 평가 (Hero Section) */}
-      <Card className="p-6 bg-gradient-to-r from-teal/10 to-coral/10 border-none">
-        <p className="text-lg text-charcoal font-medium text-center">
+      <Card className="px-4 py-3 sm:px-5 sm:py-4 bg-gradient-to-r from-teal/10 to-coral/10 border-none">
+        <p className="text-sm sm:text-base text-charcoal font-medium text-center leading-relaxed">
           {feedback.summary}
         </p>
       </Card>
 
       {/* 2. 카테고리별 요약 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
         {(Object.entries(feedback.categories) as [string, CategoryEvaluation][]).map(([key, category]) => {
           const config = CATEGORY_CONFIG[key];
           const levelStyle = LEVEL_STYLES[category.level] || LEVEL_STYLES.average;
@@ -64,19 +64,43 @@ export function CategoryFeedbackView({ feedback }: CategoryFeedbackViewProps) {
             <button
               key={key}
               onClick={() => toggleCategory(key)}
-              className={`p-4 rounded-xl border transition-all text-left ${levelStyle.bg} ${levelStyle.border} ${
-                isExpanded ? 'ring-2 ring-teal ring-offset-2' : 'hover:shadow-md'
+              className={`p-3 sm:p-4 rounded-xl border transition-all text-left cursor-pointer group ${levelStyle.bg} ${levelStyle.border} ${
+                isExpanded
+                  ? 'ring-2 ring-teal ring-offset-1 shadow-md'
+                  : 'hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]'
               }`}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">{config.icon}</span>
-                <span className="font-medium text-charcoal text-sm">{config.label}</span>
+              <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-lg sm:text-xl">{config.icon}</span>
+                  <span className="font-medium text-charcoal text-xs sm:text-sm">{config.label}</span>
+                </div>
+                {/* Chevron 아이콘 - 클릭 가능함을 표시 */}
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  className={`text-gray-soft transition-transform duration-200 flex-shrink-0 ${
+                    isExpanded ? 'rotate-180 text-teal' : 'group-hover:translate-y-0.5'
+                  }`}
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
               </div>
-              <p className={`text-sm font-semibold ${levelStyle.text}`}>
+              <p className={`text-xs sm:text-sm font-semibold ${levelStyle.text}`}>
                 {category.label}
               </p>
-              <p className="text-xs text-gray-warm mt-1 truncate">
-                {category.highlight}
+              <p className="text-[11px] sm:text-xs text-gray-warm mt-1 line-clamp-1">
+                {STATUS_ICONS[category.subcategories[0]?.status] || '•'} {category.highlight}
+              </p>
+              {/* 자세히 보기 힌트 */}
+              <p className={`text-[10px] sm:text-xs mt-1.5 sm:mt-2 font-medium transition-colors ${
+                isExpanded ? 'text-teal' : 'text-gray-soft group-hover:text-teal'
+              }`}>
+                {isExpanded ? '접기 ↑' : '자세히 →'}
               </p>
             </button>
           );
@@ -105,26 +129,26 @@ function CategoryDetailView({ categoryKey, category, onClose }: CategoryDetailVi
   const config = CATEGORY_CONFIG[categoryKey];
 
   return (
-    <Card className="p-6 bg-warm-white border-none">
-      <div className="flex items-center justify-between mb-4">
+    <Card className="p-4 sm:p-6 bg-warm-white border-none animate-in slide-in-from-top-2 duration-200">
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">{config.icon}</span>
-          <h3 className="font-semibold text-charcoal text-lg">{config.label}</h3>
-          <span className={`px-2 py-0.5 rounded-full text-xs ${LEVEL_STYLES[category.level].bg} ${LEVEL_STYLES[category.level].text}`}>
+          <span className="text-xl sm:text-2xl">{config.icon}</span>
+          <h3 className="font-semibold text-charcoal text-base sm:text-lg">{config.label}</h3>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${LEVEL_STYLES[category.level].bg} ${LEVEL_STYLES[category.level].text}`}>
             {category.label}
           </span>
         </div>
         <button
           onClick={onClose}
-          className="text-gray-soft hover:text-charcoal transition-colors"
+          className="text-gray-soft hover:text-charcoal transition-colors p-1 hover:bg-secondary rounded-lg"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-2 sm:space-y-3">
         {category.subcategories.map((sub, index) => (
           <SubcategoryRow key={index} subcategory={sub} />
         ))}
@@ -138,12 +162,12 @@ function SubcategoryRow({ subcategory }: { subcategory: SubcategoryEvaluation })
   const statusColor = STATUS_COLORS[subcategory.status];
 
   return (
-    <div className="flex items-start gap-3 p-3 bg-cream rounded-lg">
-      <span className={`text-lg ${statusColor}`}>{statusIcon}</span>
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-charcoal">{subcategory.name}</span>
-          <span className={`text-xs px-1.5 py-0.5 rounded ${
+    <div className="flex items-start gap-2 sm:gap-3 p-2.5 sm:p-3 bg-cream rounded-lg">
+      <span className={`text-base sm:text-lg ${statusColor} flex-shrink-0 mt-0.5`}>{statusIcon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <span className="font-medium text-charcoal text-sm sm:text-base">{subcategory.name}</span>
+          <span className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded ${
             subcategory.status === 'good' ? 'bg-teal-light/30 text-teal-dark' :
             subcategory.status === 'warning' ? 'bg-amber-100 text-amber-700' :
             'bg-coral-light/30 text-coral'
@@ -151,11 +175,11 @@ function SubcategoryRow({ subcategory }: { subcategory: SubcategoryEvaluation })
             {subcategory.status === 'good' ? 'Good' : subcategory.status === 'warning' ? '개선 권장' : '개선 필요'}
           </span>
         </div>
-        <p className="text-sm text-gray-warm mt-1">{subcategory.feedback}</p>
+        <p className="text-xs sm:text-sm text-gray-warm mt-1 leading-relaxed">{subcategory.feedback}</p>
         {subcategory.details && subcategory.details.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="mt-1.5 sm:mt-2 flex flex-wrap gap-1">
             {subcategory.details.map((detail, i) => (
-              <span key={i} className="text-xs bg-secondary px-2 py-1 rounded text-gray-warm">
+              <span key={i} className="text-[10px] sm:text-xs bg-secondary px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-gray-warm">
                 {detail}
               </span>
             ))}
