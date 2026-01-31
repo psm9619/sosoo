@@ -1,21 +1,119 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useAuth } from '@/lib/auth';
 
-export default function LoginPage() {
+function LoginContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { signInWithOAuth, signInWithEmail, signUpWithEmail, isAuthenticated, isLoading: authLoading } = useAuth();
+
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Supabase auth integration
-    console.log('Submit:', { email, password, isLogin });
+  // URL에서 에러 메시지 가져오기
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam));
+    }
+  }, [searchParams]);
+
+  // 이미 로그인된 경우 리다이렉트
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      const next = searchParams.get('next') || '/studio';
+      router.push(next);
+    }
+  }, [isAuthenticated, authLoading, router, searchParams]);
+
+  const handleGoogleLogin = async () => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      await signInWithOAuth('google');
+    } catch (err) {
+      setError('Google 로그인 중 오류가 발생했습니다.');
+      setIsLoading(false);
+    }
   };
+
+  const handleKakaoLogin = async () => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      await signInWithOAuth('kakao');
+    } catch (err) {
+      setError('카카오 로그인 중 오류가 발생했습니다.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
+
+    try {
+      if (isLogin) {
+        // 로그인
+        const result = await signInWithEmail(email, password);
+        if (result.error) {
+          setError(getErrorMessage(result.error));
+        } else {
+          const next = searchParams.get('next') || '/studio';
+          router.push(next);
+        }
+      } else {
+        // 회원가입
+        const result = await signUpWithEmail(email, password);
+        if (result.error) {
+          setError(getErrorMessage(result.error));
+        } else if (result.needsVerification) {
+          setSuccessMessage('인증 이메일을 발송했습니다. 이메일을 확인해주세요.');
+          setEmail('');
+          setPassword('');
+        } else {
+          const next = searchParams.get('next') || '/studio';
+          router.push(next);
+        }
+      }
+    } catch (err) {
+      setError('오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 에러 메시지 한국어화
+  function getErrorMessage(error: string): string {
+    const errorMap: Record<string, string> = {
+      'Invalid login credentials': '이메일 또는 비밀번호가 올바르지 않습니다.',
+      'Email not confirmed': '이메일 인증이 필요합니다. 메일함을 확인해주세요.',
+      'User already registered': '이미 가입된 이메일입니다.',
+      'Password should be at least 6 characters': '비밀번호는 최소 6자 이상이어야 합니다.',
+      'Unable to validate email address: invalid format': '올바른 이메일 형식이 아닙니다.',
+    };
+    return errorMap[error] || error;
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-cream">
+        <div className="animate-pulse text-gray-warm">로딩 중...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-cream">
@@ -46,12 +144,25 @@ export default function LoginPage() {
           </div>
 
           <Card className="p-8 bg-warm-white border-none shadow-xl">
+            {/* Error/Success Messages */}
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+            {successMessage && (
+              <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
+                {successMessage}
+              </div>
+            )}
+
             {/* Social Login */}
             <div className="space-y-3 mb-6">
               <Button
                 variant="outline"
                 className="w-full py-6 justify-center gap-3 hover:bg-secondary"
-                onClick={() => console.log('Google login')}
+                onClick={handleGoogleLogin}
+                disabled={isLoading}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -59,18 +170,19 @@ export default function LoginPage() {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
-                Google로 계속하기
+                {isLoading ? '로그인 중...' : 'Google로 계속하기'}
               </Button>
 
               <Button
                 variant="outline"
                 className="w-full py-6 justify-center gap-3 bg-[#FEE500] hover:bg-[#FEE500]/90 border-[#FEE500] text-charcoal"
-                onClick={() => console.log('Kakao login')}
+                onClick={handleKakaoLogin}
+                disabled={isLoading}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="#000000">
                   <path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.76 1.8 5.2 4.52 6.6-.2.72-.72 2.6-.82 3-.12.48.18.48.38.36.16-.08 2.52-1.72 3.56-2.4.76.12 1.56.2 2.36.2 5.52 0 10-3.48 10-7.76S17.52 3 12 3z" />
                 </svg>
-                카카오로 계속하기
+                {isLoading ? '로그인 중...' : '카카오로 계속하기'}
               </Button>
             </div>
 
@@ -98,6 +210,7 @@ export default function LoginPage() {
                   placeholder="hello@example.com"
                   className="w-full px-4 py-3 rounded-xl border border-border bg-cream focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent transition-all"
                   required
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -112,7 +225,12 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   className="w-full px-4 py-3 rounded-xl border border-border bg-cream focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent transition-all"
                   required
+                  minLength={6}
+                  disabled={isLoading}
                 />
+                {!isLogin && (
+                  <p className="mt-1 text-xs text-gray-soft">최소 6자 이상</p>
+                )}
               </div>
 
               {isLogin && (
@@ -126,8 +244,9 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 className="w-full py-6 bg-teal hover:bg-teal-dark text-white"
+                disabled={isLoading}
               >
-                {isLogin ? '로그인' : '회원가입'}
+                {isLoading ? '처리 중...' : isLogin ? '로그인' : '회원가입'}
               </Button>
             </form>
 
@@ -135,8 +254,13 @@ export default function LoginPage() {
             <p className="mt-6 text-center text-sm text-gray-warm">
               {isLogin ? '아직 계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
               <button
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setError(null);
+                  setSuccessMessage(null);
+                }}
                 className="text-teal hover:text-teal-dark font-medium"
+                disabled={isLoading}
               >
                 {isLogin ? '회원가입' : '로그인'}
               </button>
@@ -152,5 +276,21 @@ export default function LoginPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+function LoginLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-cream">
+      <div className="animate-pulse text-gray-warm">로딩 중...</div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginContent />
+    </Suspense>
   );
 }
