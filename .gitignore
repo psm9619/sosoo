@@ -1,0 +1,9 @@
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Playwright MCP (test artifacts)
+.playwright-mcp/
