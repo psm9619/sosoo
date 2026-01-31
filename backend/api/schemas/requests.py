@@ -179,3 +179,73 @@ class ContextUploadRequest(BaseModel):
         default_factory=list,
         description="각 문서의 타입 (resume, portfolio, project_doc 등)"
     )
+
+
+# ============================================
+# Memory 관련 스키마 🆕
+# ============================================
+
+class UserProfileSchema(BaseModel):
+    """사용자 프로필 스키마"""
+    
+    name: Optional[str] = Field(None, description="이름")
+    occupation: Optional[str] = Field(None, description="직업/직무")
+    experience_years: Optional[int] = Field(None, ge=0, le=50, description="경력 연수")
+    industry: Optional[str] = Field(None, description="산업군")
+    company_type: Optional[str] = Field(None, description="회사 유형 (대기업/스타트업 등)")
+
+
+class CareerContextSchema(BaseModel):
+    """경력 맥락 스키마"""
+    
+    current_role: Optional[str] = Field(None, description="현재 역할")
+    target_role: Optional[str] = Field(None, description="목표 역할")
+    key_skills: Optional[list[str]] = Field(default_factory=list, description="주요 스킬")
+    achievements: Optional[list[str]] = Field(default_factory=list, description="주요 성과")
+
+
+class GoalContextSchema(BaseModel):
+    """목표 맥락 스키마"""
+    
+    primary_goal: Optional[Literal["interview", "presentation", "general"]] = Field(
+        None, description="주요 목표"
+    )
+    target_company: Optional[str] = Field(None, description="목표 회사")
+    target_date: Optional[str] = Field(None, description="목표 날짜 (YYYY-MM-DD)")
+    specific_concerns: Optional[list[str]] = Field(default_factory=list, description="걱정되는 점")
+
+
+class FeedbackPreferenceSchema(BaseModel):
+    """피드백 선호 스키마"""
+    
+    style: Optional[Literal["direct", "gentle", "balanced"]] = Field(
+        None, description="피드백 스타일"
+    )
+    detail_level: Optional[Literal["brief", "detailed"]] = Field(
+        None, description="상세도"
+    )
+    language: Optional[Literal["formal", "casual"]] = Field(
+        None, description="어투"
+    )
+
+
+class UpdateLTMRequest(BaseModel):
+    """
+    Long-term Memory 업데이트 요청 스키마
+    
+    사용자 프로필, 목표 등 LTM 정보를 업데이트할 때 사용합니다.
+    워크플로우 루프를 돌지 않고 직접 업데이트합니다.
+    """
+    
+    profile: Optional[UserProfileSchema] = Field(
+        None, description="프로필 업데이트"
+    )
+    career: Optional[CareerContextSchema] = Field(
+        None, description="경력 맥락 업데이트"
+    )
+    goal: Optional[GoalContextSchema] = Field(
+        None, description="목표 맥락 업데이트"
+    )
+    feedback_preference: Optional[FeedbackPreferenceSchema] = Field(
+        None, description="피드백 선호 업데이트"
+    )

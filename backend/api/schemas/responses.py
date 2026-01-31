@@ -224,3 +224,131 @@ class HealthResponse(BaseModel):
         default_factory=dict,
         description="외부 서비스 연결 상태"
     )
+
+
+# ============================================
+# Memory 관련 응답 🆕
+# ============================================
+
+class UserProfileResponse(BaseModel):
+    """사용자 프로필 응답"""
+    name: Optional[str] = None
+    occupation: Optional[str] = None
+    experience_years: Optional[int] = None
+    industry: Optional[str] = None
+    company_type: Optional[str] = None
+
+
+class CareerContextResponse(BaseModel):
+    """경력 맥락 응답"""
+    current_role: Optional[str] = None
+    target_role: Optional[str] = None
+    key_skills: List[str] = Field(default_factory=list)
+    achievements: List[str] = Field(default_factory=list)
+
+
+class GoalContextResponse(BaseModel):
+    """목표 맥락 응답"""
+    primary_goal: Optional[str] = None
+    target_company: Optional[str] = None
+    target_date: Optional[str] = None
+    specific_concerns: List[str] = Field(default_factory=list)
+
+
+class FeedbackPreferenceResponse(BaseModel):
+    """피드백 선호 응답"""
+    style: str = "balanced"
+    detail_level: str = "detailed"
+    language: str = "formal"
+
+
+class ConfirmedTraitResponse(BaseModel):
+    """확정된 강점/약점 응답"""
+    trait_type: Literal["strength", "weakness"]
+    category: str
+    description: str
+    confirmed_count: int
+
+
+class LongTermMemoryResponse(BaseModel):
+    """
+    Long-term Memory 전체 응답
+    
+    사용자의 고정 정보와 확정된 특성을 포함합니다.
+    """
+    id: str
+    user_id: str
+    profile: UserProfileResponse
+    career: CareerContextResponse
+    goal: GoalContextResponse
+    feedback_preference: FeedbackPreferenceResponse
+    confirmed_traits: List[ConfirmedTraitResponse] = Field(default_factory=list)
+    created_at: str
+    updated_at: str
+    version: int
+
+
+class SpeechPatternResponse(BaseModel):
+    """스피치 패턴 응답"""
+    pattern_type: str
+    description: str
+    severity: Literal["high", "medium", "low"]
+    occurrence_count: int
+    trend: Literal["improving", "stable", "worsening"]
+    numeric_value: Optional[float] = None
+
+
+class ImprovementProgressResponse(BaseModel):
+    """개선 진행 응답"""
+    category: str
+    initial_score: str
+    current_score: str
+    best_score: str
+    improvement_rate: float
+    sessions_measured: int
+
+
+class ShortTermMemoryResponse(BaseModel):
+    """
+    Short-term Memory 개별 응답
+    """
+    id: str
+    user_id: str
+    memory_type: str
+    speech_pattern: Optional[SpeechPatternResponse] = None
+    improvement: Optional[ImprovementProgressResponse] = None
+    importance: Literal["high", "medium", "low"]
+    mention_count: int
+    ttl_days: int
+    created_at: str
+    updated_at: str
+    expires_at: Optional[str] = None
+
+
+class MemoryStatusResponse(BaseModel):
+    """
+    Memory 상태 요약 응답
+    
+    세션 시작 시 Memory 로드 상태를 확인할 때 사용합니다.
+    """
+    ltm_loaded: bool = Field(..., description="LTM 로드 완료 여부")
+    ltm_cache_valid: bool = Field(..., description="LTM 캐시 유효 여부")
+    stm_count: int = Field(..., description="로드된 STM 개수")
+    high_priority_patterns: List[str] = Field(
+        default_factory=list,
+        description="중요도 높은 패턴 목록"
+    )
+    improvement_trend: Optional[str] = Field(
+        None,
+        description="전체 개선 추세 (improving/stable/declining)"
+    )
+
+
+class MemoryUpdateResponse(BaseModel):
+    """Memory 업데이트 응답"""
+    success: bool = True
+    updated_fields: List[str] = Field(
+        default_factory=list,
+        description="업데이트된 필드 목록"
+    )
+    new_version: int = Field(..., description="업데이트 후 버전")

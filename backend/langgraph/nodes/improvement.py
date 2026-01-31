@@ -49,6 +49,7 @@ async def generate_improved_script(state: SpeechCoachState) -> dict:
             - transcript: 원본 텍스트
             - analysis_result: 분석 결과
             - question: 연습 중인 질문 (선택)
+            - memory_prompt_text: Memory 시스템 프롬프트 (LTM + STM)
     
     Returns:
         dict: 업데이트할 상태 필드
@@ -60,11 +61,15 @@ async def generate_improved_script(state: SpeechCoachState) -> dict:
     analysis = state["analysis_result"]
     question = state.get("question", "")
     
+    # 🆕 Memory 프롬프트 (LTM + STM 결합)
+    memory_prompt = state.get("memory_prompt_text")
+    
     # 개선 프롬프트 구성
     prompt = build_improvement_prompt(
         transcript=transcript,
         analysis=analysis,
         question=question,
+        memory_prompt=memory_prompt,  # 🆕 Memory 프롬프트 추가
     )
     
     # Claude API 호출

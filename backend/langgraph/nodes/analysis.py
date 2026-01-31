@@ -46,6 +46,7 @@ async def analyze_content(state: SpeechCoachState) -> dict:
             - audio_duration: 오디오 길이 (초)
             - previous_sessions: 이전 세션 기록 (Progressive Context)
             - user_patterns: 유저 패턴 분석 결과
+            - memory_prompt_text: Memory 시스템 프롬프트 (LTM + STM)
     
     Returns:
         dict: 업데이트할 상태 필드
@@ -65,6 +66,9 @@ async def analyze_content(state: SpeechCoachState) -> dict:
     user_patterns = state.get("user_patterns")
     previous_sessions = state.get("previous_sessions", [])
     
+    # 🆕 Memory 프롬프트 (LTM + STM 결합)
+    memory_prompt = state.get("memory_prompt_text")
+    
     # Claude 분석 프롬프트 구성
     prompt = build_analysis_prompt(
         transcript=transcript,
@@ -73,6 +77,7 @@ async def analyze_content(state: SpeechCoachState) -> dict:
         structure_data=structure_result,
         user_patterns=user_patterns,
         previous_sessions=previous_sessions,
+        memory_prompt=memory_prompt,  # 🆕 Memory 프롬프트 추가
     )
     
     # Claude API 호출

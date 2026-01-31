@@ -93,14 +93,30 @@ def build_analysis_prompt(
     structure_data: dict = None,
     user_patterns: dict = None,
     previous_sessions: List[dict] = None,
+    memory_prompt: str = None,  # 🆕 Memory 프롬프트 추가
 ) -> str:
     """
     분석 프롬프트 구성
     
-    도구에서 수집한 객관적 데이터와 Progressive Context를 포함합니다.
+    도구에서 수집한 객관적 데이터와 Progressive Context,
+    그리고 Memory 시스템의 개인화 정보를 포함합니다.
+    
+    Args:
+        transcript: 분석할 텍스트
+        pace_data: 말 속도 분석 결과
+        filler_data: 필러워드 분석 결과
+        structure_data: STAR 구조 분석 결과
+        user_patterns: Progressive Context 패턴
+        previous_sessions: 이전 세션 기록
+        memory_prompt: Memory 시스템에서 생성된 프롬프트 (LTM + STM)
     """
     
     prompt_parts = []
+    
+    # 0. Memory 프롬프트 (있으면 최상단에 배치)
+    if memory_prompt:
+        prompt_parts.append(memory_prompt)
+        prompt_parts.append("")  # 빈 줄
     
     # 1. 원본 텍스트
     prompt_parts.append(f"""## 분석할 답변
@@ -172,10 +188,24 @@ def build_improvement_prompt(
     transcript: str,
     analysis: dict,
     question: Optional[str] = None,
+    memory_prompt: str = None,  # 🆕 Memory 프롬프트 추가
 ) -> str:
-    """개선안 생성 프롬프트 구성"""
+    """
+    개선안 생성 프롬프트 구성
+    
+    Args:
+        transcript: 원본 텍스트
+        analysis: 분석 결과
+        question: 면접 질문 (있으면)
+        memory_prompt: Memory 시스템에서 생성된 프롬프트 (LTM + STM)
+    """
     
     prompt_parts = []
+    
+    # 0. Memory 프롬프트 (있으면 최상단에 배치)
+    if memory_prompt:
+        prompt_parts.append(memory_prompt)
+        prompt_parts.append("")  # 빈 줄
     
     # 1. 질문 (있으면)
     if question:
