@@ -19,11 +19,27 @@ export function Header() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, signOut } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const handleSignOut = async () => {
-    await signOut();
-    router.push('/');
-    setShowDropdown(false);
+    try {
+      setShowDropdown(false);
+      setShowMobileMenu(false);
+      await signOut();
+      // 약간의 딜레이 후 홈으로 이동 (상태 정리 시간 확보)
+      setTimeout(() => {
+        router.push('/');
+        router.refresh();
+      }, 100);
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // 에러가 나도 홈으로 이동
+      router.push('/');
+    }
+  };
+
+  const closeMobileMenu = () => {
+    setShowMobileMenu(false);
   };
 
   // 사용자 이름 또는 이메일의 첫 글자
@@ -96,7 +112,24 @@ export function Header() {
         </nav>
 
         {/* Auth Area */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* 모바일 햄버거 메뉴 버튼 */}
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="md:hidden p-2 text-gray-warm hover:text-charcoal hover:bg-secondary rounded-lg transition-colors"
+            aria-label="메뉴 열기"
+          >
+            {showMobileMenu ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 12h18M3 6h18M3 18h18" />
+              </svg>
+            )}
+          </button>
+
           {isLoading ? (
             // 로딩 상태
             <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
@@ -203,6 +236,88 @@ export function Header() {
           )}
         </div>
       </div>
+
+      {/* 모바일 메뉴 */}
+      {showMobileMenu && (
+        <>
+          {/* 배경 오버레이 */}
+          <div
+            className="fixed inset-0 bg-black/20 z-40 md:hidden"
+            onClick={closeMobileMenu}
+          />
+          {/* 메뉴 패널 */}
+          <div className="fixed top-16 left-0 right-0 bg-warm-white border-b border-border shadow-lg z-50 md:hidden animate-in slide-in-from-top-2 duration-200">
+            <nav className="max-w-6xl mx-auto px-4 py-4 space-y-1">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={closeMobileMenu}
+                  className={cn(
+                    'block px-4 py-3 rounded-lg text-sm font-medium transition-all',
+                    item.highlight
+                      ? pathname === item.href || pathname?.startsWith('/studio')
+                        ? 'bg-gradient-to-r from-teal to-teal-dark text-white'
+                        : 'text-teal font-semibold bg-teal-light/20'
+                      : pathname === item.href
+                        ? 'text-teal bg-teal-light/30'
+                        : 'text-charcoal hover:bg-secondary'
+                  )}
+                >
+                  {item.highlight ? (
+                    <span className="inline-flex items-center gap-2">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z"
+                          fill="currentColor"
+                        />
+                        <path
+                          d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                      {item.label}
+                    </span>
+                  ) : (
+                    item.label
+                  )}
+                </Link>
+              ))}
+
+              {/* 로그인 상태에 따른 추가 메뉴 */}
+              {isAuthenticated ? (
+                <>
+                  <div className="border-t border-border my-2 pt-2">
+                    <Link
+                      href="/my"
+                      onClick={closeMobileMenu}
+                      className="block px-4 py-3 rounded-lg text-sm font-medium text-charcoal hover:bg-secondary transition-colors"
+                    >
+                      마이페이지
+                    </Link>
+                    <button
+                      onClick={handleSignOut}
+                      className="w-full text-left px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      로그아웃
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="border-t border-border my-2 pt-2">
+                  <Link
+                    href="/login"
+                    onClick={closeMobileMenu}
+                    className="block px-4 py-3 rounded-lg text-sm font-medium text-teal bg-teal-light/30 hover:bg-teal-light/50 transition-colors text-center"
+                  >
+                    로그인
+                  </Link>
+                </div>
+              )}
+            </nav>
+          </div>
+        </>
+      )}
     </header>
   );
 }
