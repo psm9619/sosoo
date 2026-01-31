@@ -71,6 +71,13 @@ export interface PriorityRankingInfo {
   priorityFeedbackOrder: string[];
 }
 
+/** 모더레이션 결과 */
+export interface ModerationInfo {
+  isFlagged: boolean;
+  warningMessage: string | null;
+  flagTypes: string[];
+}
+
 /** AI 분석 결과 전체 */
 export interface AnalysisResult {
   scores: ScoreCard;
@@ -79,6 +86,7 @@ export interface AnalysisResult {
   structureAnalysis?: string | null;
   progressiveContextNote?: string | null;
   priorityRanking?: PriorityRankingInfo | null;
+  moderation?: ModerationInfo | null;
 }
 
 // ============================================
@@ -99,6 +107,7 @@ export interface AnalyzeRequest {
   projectId?: string | null;
   mode?: AnalysisMode;
   voiceType?: VoiceType;
+  useVoiceClone?: boolean; // 사용자 보이스 클론 사용 여부
   question?: string | null;
   projectType?: ProjectType;
   userId?: string | null; // Progressive Context용 사용자 ID

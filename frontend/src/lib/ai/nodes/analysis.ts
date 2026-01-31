@@ -6,13 +6,14 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { SpeechCoachState } from '../state';
 import type { ProjectType } from '@/types/project';
-import type { AnalysisResult, ScoreCard, AnalysisMetrics, ImprovementSuggestion, PriorityRankingInfo } from '@/types/api';
+import type { AnalysisResult, ScoreCard, AnalysisMetrics, ImprovementSuggestion, PriorityRankingInfo, ModerationInfo } from '@/types/api';
 import { analyzePace } from '../tools/pace-analysis';
 import { analyzeFillers } from '../tools/filler-analysis';
 import { analyzeStructure } from '../tools/structure-analysis';
 import { analyzeAllCategories, getCategorySummary } from '../tools/category-analyzer';
 import { analyzePriority, getCategoryNameKo, getSituationLabel, isEqualWeight } from '../tools/priority-tools';
 import { ANALYSIS_SYSTEM_PROMPT, buildAnalysisPrompt } from '../prompts';
+import { moderateContent, isContentProcessable, getModerationWarningMessage, type ModerationResult } from './moderation';
 
 // Lazy-loaded Anthropic client
 let anthropicInstance: Anthropic | null = null;
@@ -49,19 +50,30 @@ export async function analyzeContent(
     progressiveContext?: SpeechCoachState['progressiveContext'];
   }
 ): Promise<AnalysisResult> {
+  // 0. 콘텐츠 모더레이션
+  const moderationResult = moderateContent(transcript);
+
+  // 처리 불가능한 콘텐츠인 경우 에러 throw
+  if (!isContentProcessable(moderationResult)) {
+    throw new Error('부적절한 콘텐츠가 감지되었습니다. 면접/발표에 적합한 내용으로 다시 녹음해주세요.');
+  }
+
+  // 마스킹된 텍스트 사용 (개인정보 보호)
+  const processedTranscript = moderationResult.maskedText;
+
   // 1. 도구 실행 (병렬)
   const [paceResult, fillerResult, structureResult] = await Promise.all([
-    Promise.resolve(analyzePace(transcript, duration)),
-    Promise.resolve(analyzeFillers(transcript)),
-    Promise.resolve(analyzeStructure(transcript)),
+    Promise.resolve(analyzePace(processedTranscript, duration)),
+    Promise.resolve(analyzeFillers(processedTranscript)),
+    Promise.resolve(analyzeStructure(processedTranscript)),
   ]);
 
   // 1.5 자유스피치: 4가지 카테고리 분석 + 우선순위 랭킹
   let priorityRanking: PriorityRankingInfo | null = null;
 
   if (options?.projectType === 'free_speech') {
-    const categoryResults = analyzeAllCategories(transcript, duration);
-    const priorityResult = analyzePriority(transcript, categoryResults, {
+    const categoryResults = analyzeAllCategories(processedTranscript, duration);
+    const priorityResult = analyzePriority(processedTranscript, categoryResults, {
       question: options.question,
       projectType: 'free_speech',
     });
@@ -90,7 +102,7 @@ export async function analyzeContent(
 
   // 2. 프롬프트 구성
   const prompt = buildAnalysisPrompt({
-    transcript,
+    transcript: processedTranscript,
     duration,
     question: options?.question,
     paceResult: {
@@ -136,6 +148,15 @@ export async function analyzeContent(
   // 5. Progressive Context 노트 추가
   if (userPatterns && userPatterns.sessionCount > 0) {
     analysisResult.progressiveContextNote = generateProgressiveNote(userPatterns, analysisResult);
+  }
+
+  // 6. 모더레이션 정보 추가
+  if (moderationResult.flags.length > 0) {
+    analysisResult.moderation = {
+      isFlagged: moderationResult.isFlagged,
+      warningMessage: getModerationWarningMessage(moderationResult),
+      flagTypes: moderationResult.flags.map((f) => f.type),
+    };
   }
 
   return analysisResult;

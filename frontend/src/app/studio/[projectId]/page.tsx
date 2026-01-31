@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth/hooks';
 import { getProjectById } from '@/lib/supabase/projects';
 import { INTERVIEW_CATEGORY_LABELS } from '@/types';
 import type { Project } from '@/types';
+import { DDayBadge, PrepChecklist } from '@/components/project';
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -168,6 +169,9 @@ export default function ProjectDetailPage() {
                   }`}>
                     {isInterview ? '💼 면접' : project.type === 'presentation' ? '🎤 발표' : '🎙️ 자유'}
                   </span>
+                  {project.targetDate && (
+                    <DDayBadge targetDate={project.targetDate} size="md" />
+                  )}
                 </div>
                 <h1 className="text-2xl md:text-3xl font-bold text-charcoal mb-2">
                   {project.title}
@@ -213,6 +217,15 @@ export default function ProjectDetailPage() {
               </p>
               <p className="text-sm text-gray-warm">평균 점수</p>
             </Card>
+          </div>
+
+          {/* Prep Checklist - shown 7 days before deadline */}
+          <div className="mb-8">
+            <PrepChecklist
+              questions={project.questions}
+              targetDate={project.targetDate}
+              onQuestionClick={(questionId) => router.push(`/studio/${projectId}/q/${questionId}`)}
+            />
           </div>
 
           {/* Questions List - Grouped by Category (Interview) or Simple List (Presentation) */}

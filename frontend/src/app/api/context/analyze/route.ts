@@ -61,8 +61,11 @@ async function extractTextFromFile(file: File): Promise<string> {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[Context Analyze API] Request received');
+
   try {
     const contentType = request.headers.get('content-type') || '';
+    console.log('[Context Analyze API] Content-Type:', contentType);
 
     let documentText: string | undefined;
     let documentType: 'resume' | 'presentation' | 'other' = 'other';
@@ -75,14 +78,19 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
       const file = formData.get('file') as File | null;
 
+      console.log('[Context Analyze API] FormData received, file:', file?.name, file?.size, file?.type);
+
       if (!file) {
+        console.log('[Context Analyze API] No file in FormData');
         return NextResponse.json(
           { error: 'file이 필요합니다.' },
           { status: 400 }
         );
       }
 
+      console.log('[Context Analyze API] Extracting text from file...');
       documentText = await extractTextFromFile(file);
+      console.log('[Context Analyze API] Text extracted, length:', documentText.length);
       documentType = (formData.get('documentType') as string || 'other') as typeof documentType;
       projectType = (formData.get('projectType') as string || 'interview') as typeof projectType;
       company = formData.get('company') as string | undefined;
@@ -144,14 +152,16 @@ export async function POST(request: NextRequest) {
       position,
     };
 
+    console.log('[Context Analyze API] Starting AI analysis...');
     const result = await analyzeContext(input);
+    console.log('[Context Analyze API] Analysis complete:', result.summary?.substring(0, 100));
 
     return NextResponse.json({
       success: true,
       data: result,
     });
   } catch (error) {
-    console.error('Context analysis error:', error);
+    console.error('[Context Analyze API] Error:', error);
     return NextResponse.json(
       {
         success: false,

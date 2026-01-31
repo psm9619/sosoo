@@ -20,6 +20,8 @@ import type { Attempt } from '@/types';
 export async function createAttempt(data: CreateAttemptInput): Promise<Attempt> {
   const supabase = createClient();
 
+  console.log('[createAttempt] Creating attempt for question:', data.question_id, 'user:', data.user_id);
+
   const { data: attempt, error } = await supabase
     .from('attempts')
     .insert({
@@ -33,6 +35,8 @@ export async function createAttempt(data: CreateAttemptInput): Promise<Attempt> 
     console.error('[createAttempt] Error:', error);
     throw new Error(`시도 생성 실패: ${error.message}`);
   }
+
+  console.log('[createAttempt] Attempt created successfully:', attempt.id);
 
   const { dbAttemptToAttempt } = await import('./types');
   return dbAttemptToAttempt(attempt as DBAttempt);

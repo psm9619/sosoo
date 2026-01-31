@@ -1,18 +1,211 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header, Footer } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useProjectStore } from '@/lib/stores/project-store';
+import { useUserStore } from '@/lib/stores/user-store';
+import { useAuth } from '@/lib/auth';
+import { getProjects, deleteProject as deleteProjectFromDB } from '@/lib/supabase/projects';
+import { VoiceCloneOnboarding, VoiceCloneStatus, VoiceCloneRecorder } from '@/components/voice-clone';
+import { getUserVoiceClone, deleteVoiceClone, createVoiceClone, pollVoiceCloneStatus } from '@/lib/api/voice-clone';
+import type { Project } from '@/types';
 
 type TabType = 'projects' | 'settings';
 
-export default function MyPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('projects');
+// 관리자 이메일 목록
+const ADMIN_EMAILS = [
+  process.env.NEXT_PUBLIC_ADMIN_EMAIL,
+  'soominp17@gmail.com',
+].filter(Boolean);
 
-  const { projects, deleteProject } = useProjectStore();
+function MyPageContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab') as TabType | null;
+  const [activeTab, setActiveTab] = useState<TabType>(tabParam === 'settings' ? 'settings' : 'projects');
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [voiceCloneError, setVoiceCloneError] = useState<string | null>(null);
+
+  const { projects: localProjects, deleteProject } = useProjectStore();
+  const { voiceClone, setVoiceCloneFromResponse, clearVoiceClone, setVoiceCloneStatus } = useUserStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // 관리자 여부 확인
+  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
+
+  // 프로젝트 목록 (DB 또는 로컬)
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+
+  // 프로젝트 목록 로드
+  useEffect(() => {
+    async function loadProjects() {
+      setIsLoadingProjects(true);
+
+      if (isAuthenticated && user) {
+        try {
+          console.log('[MyPage] Fetching projects from DB for user:', user.id);
+          const dbProjects = await getProjects(user.id);
+          console.log('[MyPage] DB projects loaded:', dbProjects.length, 'projects');
+
+          // DB 프로젝트의 attempts 카운트 확인을 위해 상세 정보 필요
+          // getProjects는 간단한 통계만 반환하므로, DB 프로젝트 사용
+          if (dbProjects.length > 0) {
+            setProjects(dbProjects);
+            setIsLoadingProjects(false);
+            return;
+          }
+        } catch (error) {
+          console.error('[MyPage] Failed to load projects from DB:', error);
+        }
+      }
+
+      // 비로그인 또는 DB 조회 실패: 로컬 스토어 사용
+      console.log('[MyPage] Using local projects:', localProjects.length);
+      setProjects(localProjects);
+      setIsLoadingProjects(false);
+    }
+
+    if (!authLoading) {
+      loadProjects();
+    }
+  }, [isAuthenticated, authLoading, user, localProjects]);
+
+  // URL 파라미터로부터 탭 동기화
+  useEffect(() => {
+    if (tabParam === 'settings') {
+      setActiveTab('settings');
+    }
+  }, [tabParam]);
+
+  // 로그인한 사용자의 음성 클론 상태 조회
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const fetchVoiceClone = async () => {
+      try {
+        const data = await getUserVoiceClone();
+        if (data) {
+          setVoiceCloneFromResponse({
+            voiceCloneId: data.voiceCloneId,
+            voiceName: data.voiceName,
+            status: data.status,
+            sampleAudioUrl: data.sampleAudioUrl,
+          });
+
+          // 처리 중이면 폴링 시작
+          if (data.status === 'processing') {
+            pollVoiceCloneStatus(data.voiceCloneId, {
+              onStatusChange: setVoiceCloneStatus,
+              onReady: (response) => {
+                setVoiceCloneFromResponse({
+                  voiceCloneId: response.voiceCloneId,
+                  voiceName: response.voiceName,
+                  status: 'ready',
+                  sampleAudioUrl: response.sampleAudioUrl,
+                });
+              },
+              onError: (err) => {
+                setVoiceCloneError(err.message);
+              },
+            });
+          }
+        }
+      } catch (err) {
+        // 404는 무시 (음성 클론 없음)
+        console.error('Failed to fetch voice clone:', err);
+      }
+    };
+
+    fetchVoiceClone();
+  }, [isAuthenticated, setVoiceCloneFromResponse, setVoiceCloneStatus]);
+
+  // 음성 클론 삭제
+  const handleDeleteVoiceClone = useCallback(async () => {
+    if (!voiceClone.voiceCloneId) return;
+    if (!confirm('정말 음성 클론을 삭제하시겠어요?\n삭제 후 다시 녹음해야 합니다.')) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteVoiceClone(voiceClone.voiceCloneId);
+      clearVoiceClone();
+    } catch (err) {
+      setVoiceCloneError(err instanceof Error ? err.message : '삭제에 실패했습니다.');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [voiceClone.voiceCloneId, clearVoiceClone]);
+
+  // 새 녹음 제출
+  const handleRecordingComplete = useCallback(async (audioBlob: Blob, durationSeconds: number) => {
+    setIsUploading(true);
+    setVoiceCloneError(null);
+
+    try {
+      const response = await createVoiceClone({
+        audioBlob,
+        voiceName: '내 목소리',
+        consentGiven: true,
+      });
+
+      setVoiceCloneFromResponse({
+        voiceCloneId: response.voiceCloneId,
+        voiceName: response.voiceName,
+        status: response.status,
+      });
+
+      setIsRecording(false);
+
+      // 처리 중이면 폴링 시작
+      if (response.status === 'processing') {
+        pollVoiceCloneStatus(response.voiceCloneId, {
+          onStatusChange: setVoiceCloneStatus,
+          onReady: (data) => {
+            setVoiceCloneFromResponse({
+              voiceCloneId: data.voiceCloneId,
+              voiceName: data.voiceName,
+              status: 'ready',
+              sampleAudioUrl: data.sampleAudioUrl,
+            });
+          },
+          onError: (err) => {
+            setVoiceCloneError(err.message);
+          },
+        });
+      }
+    } catch (err) {
+      setVoiceCloneError(err instanceof Error ? err.message : '업로드에 실패했습니다.');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [setVoiceCloneFromResponse, setVoiceCloneStatus]);
+
+  // 프로젝트 삭제 핸들러
+  const handleDeleteProject = useCallback(async (projectId: string) => {
+    if (!confirm('정말 삭제하시겠어요?')) return;
+
+    if (isAuthenticated && user) {
+      // DB에서 삭제 (soft delete)
+      try {
+        await deleteProjectFromDB(projectId);
+        // UI 상태 업데이트
+        setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      } catch (error) {
+        console.error('[MyPage] Failed to delete project:', error);
+        alert('삭제에 실패했습니다. 다시 시도해주세요.');
+      }
+    } else {
+      // 로컬 스토어에서 삭제
+      deleteProject(projectId);
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    }
+  }, [isAuthenticated, user, deleteProject]);
 
   // Format date to Korean style
   const formatDate = (dateString: string) => {
@@ -30,14 +223,29 @@ export default function MyPage() {
       <main className="flex-1 pt-16">
         {/* Profile Header */}
         <section className="py-12 px-6 bg-warm-white border-b border-border">
-          <div className="max-w-4xl mx-auto flex items-center gap-6">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center text-white text-2xl font-bold">
-              U
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center text-white text-2xl font-bold">
+                {user?.email?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-charcoal">
+                  {user?.user_metadata?.full_name || user?.email?.split('@')[0] || '사용자'}님
+                </h1>
+                <p className="text-gray-warm">{user?.email || 'user@example.com'}</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-charcoal">사용자님</h1>
-              <p className="text-gray-warm">user@example.com</p>
-            </div>
+            {isAdmin && (
+              <Link href="/admin">
+                <Button variant="outline" className="gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 4.5v15m7.5-7.5h-15" />
+                    <circle cx="12" cy="12" r="10" />
+                  </svg>
+                  관리자 대시보드
+                </Button>
+              </Link>
+            )}
           </div>
         </section>
 
@@ -181,11 +389,7 @@ export default function MyPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="text-gray-soft hover:text-destructive"
-                                onClick={() => {
-                                  if (confirm('정말 삭제하시겠어요?')) {
-                                    deleteProject(project.id);
-                                  }
-                                }}
+                                onClick={() => handleDeleteProject(project.id)}
                               >
                                 <svg
                                   width="16"
@@ -242,6 +446,83 @@ export default function MyPage() {
 
             {activeTab === 'settings' && (
               <div className="space-y-6">
+                {/* Voice Clone Settings */}
+                <Card className="p-6 bg-warm-white border-none">
+                  <h3 className="font-semibold text-charcoal mb-4">나의 목소리</h3>
+
+                  {/* 에러 메시지 */}
+                  {voiceCloneError && (
+                    <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                      {voiceCloneError}
+                    </div>
+                  )}
+
+                  {/* 녹음 UI */}
+                  {isRecording ? (
+                    <VoiceCloneRecorder
+                      onRecordingComplete={handleRecordingComplete}
+                      onCancel={() => setIsRecording(false)}
+                      isUploading={isUploading}
+                    />
+                  ) : voiceClone.status ? (
+                    // 상태 표시
+                    <div className="space-y-4">
+                      <VoiceCloneStatus
+                        status={voiceClone.status}
+                        voiceName={voiceClone.voiceName || '내 목소리'}
+                        onRetry={() => setIsRecording(true)}
+                        onDelete={handleDeleteVoiceClone}
+                        isDeleting={isDeleting}
+                      />
+                      {voiceClone.status === 'ready' && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsRecording(true)}
+                          className="mt-2"
+                        >
+                          새로 녹음하기
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    // 등록 안내
+                    <div className="bg-cream rounded-xl p-6 text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-teal/10 flex items-center justify-center">
+                        <svg
+                          width="32"
+                          height="32"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="text-teal"
+                        >
+                          <path
+                            d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z"
+                            fill="currentColor"
+                          />
+                          <path
+                            d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </div>
+                      <h4 className="font-semibold text-charcoal mb-2">
+                        나의 목소리로 듣기
+                      </h4>
+                      <p className="text-sm text-gray-warm mb-4">
+                        AI가 개선한 스피치를 나의 목소리로 들을 수 있어요.
+                        <br />
+                        30초-1분 분량의 샘플만 녹음하면 됩니다.
+                      </p>
+                      <Button
+                        onClick={() => setIsOnboardingOpen(true)}
+                        className="bg-teal hover:bg-teal-dark"
+                      >
+                        음성 등록하기
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+
                 {/* Profile Settings */}
                 <Card className="p-6 bg-warm-white border-none">
                   <h3 className="font-semibold text-charcoal mb-4">프로필</h3>
@@ -252,7 +533,7 @@ export default function MyPage() {
                       </label>
                       <input
                         type="text"
-                        defaultValue="사용자"
+                        defaultValue={user?.user_metadata?.full_name || user?.email?.split('@')[0] || '사용자'}
                         className="w-full max-w-sm px-4 py-3 rounded-xl border border-border bg-cream focus:outline-none focus:ring-2 focus:ring-teal"
                       />
                     </div>
@@ -262,7 +543,7 @@ export default function MyPage() {
                       </label>
                       <input
                         type="email"
-                        defaultValue="user@example.com"
+                        defaultValue={user?.email || 'user@example.com'}
                         disabled
                         className="w-full max-w-sm px-4 py-3 rounded-xl border border-border bg-secondary text-gray-warm"
                       />
@@ -329,6 +610,30 @@ export default function MyPage() {
         </section>
       </main>
       <Footer />
+
+      {/* Voice Clone Onboarding Modal */}
+      <VoiceCloneOnboarding
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        onComplete={() => {
+          setIsOnboardingOpen(false);
+        }}
+      />
     </div>
+  );
+}
+
+export default function MyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex flex-col bg-cream">
+        <Header />
+        <main className="flex-1 pt-16 flex items-center justify-center">
+          <div className="animate-pulse text-gray-warm">로딩 중...</div>
+        </main>
+      </div>
+    }>
+      <MyPageContent />
+    </Suspense>
   );
 }

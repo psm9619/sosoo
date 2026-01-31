@@ -12,6 +12,7 @@ export interface AnalyzeParams {
   mode?: 'quick' | 'deep';
   projectType?: 'interview' | 'presentation' | 'free_speech';
   userId?: string; // Progressive Context용 사용자 ID
+  useVoiceClone?: boolean; // 사용자 보이스 클론 사용 여부
 }
 
 export interface AnalyzeProgress {
@@ -59,7 +60,7 @@ export async function analyzeAudio(
     onError?: (error: { code: string; message: string }) => void;
   }
 ): Promise<AnalyzeResult> {
-  const { audioBlob, question, projectId, mode = 'quick', projectType, userId } = params;
+  const { audioBlob, question, projectId, mode = 'quick', projectType, userId, useVoiceClone } = params;
   const { onProgress, onComplete, onError } = callbacks;
 
   // 오디오 업로드
@@ -79,6 +80,7 @@ export async function analyzeAudio(
         mode,
         projectType,
         userId,
+        useVoiceClone,
       }),
     })
       .then(async (response) => {

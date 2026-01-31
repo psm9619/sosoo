@@ -27,11 +27,20 @@ interface GenerateQuestionsRequest {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[Questions Generate API] Request received');
+
   try {
     const body = (await request.json()) as GenerateQuestionsRequest;
+    console.log('[Questions Generate API] Body:', {
+      projectType: body.projectType,
+      hasContext: !!body.context,
+      company: body.company,
+      position: body.position,
+    });
 
     // 입력 검증
     if (!body.projectType) {
+      console.log('[Questions Generate API] Missing projectType');
       return NextResponse.json(
         { error: 'projectType이 필요합니다.' },
         { status: 400 }
@@ -39,6 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!body.context) {
+      console.log('[Questions Generate API] Missing context');
       return NextResponse.json(
         { error: 'context (분석 결과)가 필요합니다.' },
         { status: 400 }
@@ -59,6 +69,7 @@ export async function POST(request: NextRequest) {
 
     // 면접 프로젝트
     if (body.projectType === 'interview') {
+      console.log('[Questions Generate API] Generating interview questions...');
       const result = await generateQuestions({
         projectType: body.projectType,
         context: body.context,
@@ -67,6 +78,7 @@ export async function POST(request: NextRequest) {
         questionsPerCategory: body.questionsPerCategory,
       });
 
+      console.log('[Questions Generate API] Generated', result.questions.length, 'questions');
       return NextResponse.json({
         success: true,
         data: result,
@@ -92,7 +104,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   } catch (error) {
-    console.error('Question generation error:', error);
+    console.error('[Questions Generate API] Error:', error);
     return NextResponse.json(
       {
         success: false,

@@ -281,6 +281,7 @@ export function dbProjectToProject(dbProject: DBProject, questions: Question[] =
       achievements: exp.achievements,
     })) || undefined,
     contextStrengths: undefined, // DB에는 없는 필드
+    targetDate: dbProject.target_date || undefined,
     questions,
     createdAt: dbProject.created_at,
     updatedAt: dbProject.updated_at,
