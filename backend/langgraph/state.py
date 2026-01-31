@@ -210,13 +210,60 @@ class ShortTermMemory(TypedDict):
 # 분석 관련 TypedDict
 # ============================================
 
+# ============================================
+# Priority Ranking TypedDict
+# ============================================
+
+class SituationContext(TypedDict):
+    """상황 분석 컨텍스트"""
+    situation_type: str                 # interview_technical, free_speech 등
+    confidence: float                   # 분류 신뢰도 (0-1)
+    reasoning: str                      # 분류 근거
+    detected_keywords: List[str]        # 감지된 키워드
+
+
+class CategoryWeight(TypedDict):
+    """카테고리별 가중치"""
+    category: str                       # delivery, structure, content, persuasion
+    weight: float                       # 1.0 = 기본, 1.3 = 중요, 0.7 = 덜 중요
+    priority_rank: int                  # 1 = 최우선
+    reason: str                         # 가중치 이유
+
+
+class CategoryScore(TypedDict):
+    """카테고리별 점수"""
+    raw_score: int                      # 원본 점수 (0-100)
+    weighted_score: float               # 가중치 적용 점수
+    sub_scores: Dict[str, int]          # 세부 점수
+    issues: List[str]                   # 발견된 문제점
+    strengths: List[str]                # 강점
+
+
+class PriorityRankingResult(TypedDict):
+    """우선순위 랭킹 결과"""
+    situation: SituationContext
+    weights: List[CategoryWeight]
+    focus_message: str                  # "이 상황에서는 OO이 가장 중요합니다"
+
+
+# ============================================
+# 분석 관련 TypedDict
+# ============================================
+
 class AnalysisScores(TypedDict):
-    """분석 점수"""
+    """분석 점수 (4개 카테고리 기반)"""
+    # 기존 호환성 유지
     logic_structure: str
     filler_words: str
     speaking_pace: str
     confidence_tone: str
     content_specificity: str
+    
+    # 새 카테고리 점수 (0-100)
+    delivery: Optional[int]             # 전달력
+    structure: Optional[int]            # 구조력
+    content: Optional[int]              # 내용력
+    persuasion: Optional[int]           # 설득력
 
 
 class AnalysisMetrics(TypedDict):
@@ -538,6 +585,21 @@ class SpeechCoachState(TypedDict):
     
     # ===== Memory 추출 결과 =====
     memory_extraction_result: Optional[Dict[str, Any]]
+    
+    # ===== Priority Ranking System =====
+    # 사용자 상황 분류
+    speech_situation: Optional[str]             # "interview_technical", "free_speech" 등
+    situation_context: Optional[SituationContext]
+    
+    # 카테고리 우선순위 & 가중치
+    category_weights: Optional[List[CategoryWeight]]
+    priority_ranking_result: Optional[PriorityRankingResult]
+    
+    # 카테고리별 점수 (가중치 적용 전/후)
+    category_scores: Optional[Dict[str, CategoryScore]]  # delivery, structure, content, persuasion
+    weighted_scores: Optional[Dict[str, Any]]
+    total_weighted_score: Optional[float]
+    priority_feedback_order: Optional[List[str]]  # 피드백 우선순위 순서
 
 
 # ============================================
@@ -626,6 +688,16 @@ def create_initial_state(
         
         # Memory 추출
         memory_extraction_result=None,
+        
+        # Priority Ranking
+        speech_situation=None,
+        situation_context=None,
+        category_weights=None,
+        priority_ranking_result=None,
+        category_scores=None,
+        weighted_scores=None,
+        total_weighted_score=None,
+        priority_feedback_order=None,
     )
 
 

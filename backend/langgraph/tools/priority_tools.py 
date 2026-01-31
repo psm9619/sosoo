@@ -1,0 +1,602 @@
+"""
+Priority Ranking 도구
+
+사용자 상황에 따라 평가 카테고리의 우선순위를 동적으로 결정합니다.
+
+## 카테고리 정의
+
+1. 전달력 (Delivery): 말 속도, 필러워드, 발음, 청취 편의성
+2. 구조력 (Structure): 논리적 흐름, STAR 구조, 두괄식
+3. 내용력 (Content): 구체성, 숫자/성과, 사례, 직무 관련성
+4. 설득력 (Persuasion): 자신감, 톤, 강조, 설득 어휘
+
+## 상황별 기본 우선순위
+
+- 면접 (기술): 내용 > 구조 > 전달 > 설득
+- 면접 (인성): 설득 > 전달 > 구조 > 내용
+- 발표 (비즈니스): 구조 > 설득 > 내용 > 전달
+- 발표 (학술): 내용 > 구조 > 전달 > 설득
+- 자유 스피치: 전달 > 구조 > 설득 > 내용
+"""
+
+from typing import List, Dict, Optional
+from enum import Enum
+
+
+# ============================================
+# Enum 정의
+# ============================================
+
+class SpeechCategory(str, Enum):
+    """스피치 평가 카테고리"""
+    DELIVERY = "delivery"        # 전달력
+    STRUCTURE = "structure"      # 구조력
+    CONTENT = "content"          # 내용력
+    PERSUASION = "persuasion"    # 설득력
+
+
+class SpeechSituation(str, Enum):
+    """스피치 상황 타입"""
+    INTERVIEW_TECH = "interview_technical"          # 기술 면접
+    INTERVIEW_BEHAVIORAL = "interview_behavioral"   # 인성/컬처핏 면접
+    INTERVIEW_GENERAL = "interview_general"         # 일반 면접
+    PRESENTATION_BUSINESS = "presentation_business" # 비즈니스 발표
+    PRESENTATION_ACADEMIC = "presentation_academic" # 학술 발표
+    FREE_SPEECH = "free_speech"                     # 자유 스피치
+    PITCH = "pitch"                                 # 투자/사업 피칭
+    TOAST = "toast"                                 # 축사/스피치
+
+
+# ============================================
+# 상황별 기본 가중치 매트릭스
+# ============================================
+
+DEFAULT_WEIGHTS: Dict[str, Dict[str, float]] = {
+    # 면접 - 기술
+    SpeechSituation.INTERVIEW_TECH.value: {
+        SpeechCategory.CONTENT.value: 1.4,      # 가장 중요 (구체적 기술 경험)
+        SpeechCategory.STRUCTURE.value: 1.2,    # 논리적 설명
+        SpeechCategory.DELIVERY.value: 1.0,     # 기본
+        SpeechCategory.PERSUASION.value: 0.8,   # 상대적으로 덜 중요
+    },
+    
+    # 면접 - 인성/컬처핏
+    SpeechSituation.INTERVIEW_BEHAVIORAL.value: {
+        SpeechCategory.PERSUASION.value: 1.4,   # 가장 중요 (신뢰감, 팀워크)
+        SpeechCategory.DELIVERY.value: 1.2,     # 소통 능력
+        SpeechCategory.STRUCTURE.value: 1.0,    # STAR 구조
+        SpeechCategory.CONTENT.value: 0.9,      # 내용보다 태도
+    },
+    
+    # 면접 - 일반
+    SpeechSituation.INTERVIEW_GENERAL.value: {
+        SpeechCategory.STRUCTURE.value: 1.2,
+        SpeechCategory.CONTENT.value: 1.2,
+        SpeechCategory.DELIVERY.value: 1.0,
+        SpeechCategory.PERSUASION.value: 1.0,
+    },
+    
+    # 발표 - 비즈니스
+    SpeechSituation.PRESENTATION_BUSINESS.value: {
+        SpeechCategory.STRUCTURE.value: 1.4,    # 명확한 전달
+        SpeechCategory.PERSUASION.value: 1.3,   # 설득력
+        SpeechCategory.CONTENT.value: 1.0,
+        SpeechCategory.DELIVERY.value: 0.9,
+    },
+    
+    # 발표 - 학술
+    SpeechSituation.PRESENTATION_ACADEMIC.value: {
+        SpeechCategory.CONTENT.value: 1.5,      # 정확한 내용
+        SpeechCategory.STRUCTURE.value: 1.3,    # 논리적 흐름
+        SpeechCategory.DELIVERY.value: 1.0,
+        SpeechCategory.PERSUASION.value: 0.7,   # 상대적으로 덜 중요
+    },
+    
+    # 자유 스피치
+    SpeechSituation.FREE_SPEECH.value: {
+        SpeechCategory.DELIVERY.value: 1.4,     # 청중 집중
+        SpeechCategory.STRUCTURE.value: 1.2,
+        SpeechCategory.PERSUASION.value: 1.0,
+        SpeechCategory.CONTENT.value: 0.8,
+    },
+    
+    # 투자 피칭
+    SpeechSituation.PITCH.value: {
+        SpeechCategory.PERSUASION.value: 1.5,   # 투자 설득
+        SpeechCategory.CONTENT.value: 1.3,      # 숫자, 시장 데이터
+        SpeechCategory.STRUCTURE.value: 1.2,
+        SpeechCategory.DELIVERY.value: 0.9,
+    },
+    
+    # 축사/스피치
+    SpeechSituation.TOAST.value: {
+        SpeechCategory.DELIVERY.value: 1.4,     # 전달력 중요
+        SpeechCategory.PERSUASION.value: 1.3,   # 감정 전달
+        SpeechCategory.STRUCTURE.value: 1.0,
+        SpeechCategory.CONTENT.value: 0.8,
+    },
+}
+
+
+# 카테고리 한글 라벨
+CATEGORY_LABELS = {
+    SpeechCategory.DELIVERY.value: "전달력",
+    SpeechCategory.STRUCTURE.value: "구조력",
+    SpeechCategory.CONTENT.value: "내용력",
+    SpeechCategory.PERSUASION.value: "설득력",
+}
+
+# 상황 한글 라벨
+SITUATION_LABELS = {
+    SpeechSituation.INTERVIEW_TECH.value: "기술 면접",
+    SpeechSituation.INTERVIEW_BEHAVIORAL.value: "인성/컬처핏 면접",
+    SpeechSituation.INTERVIEW_GENERAL.value: "면접",
+    SpeechSituation.PRESENTATION_BUSINESS.value: "비즈니스 발표",
+    SpeechSituation.PRESENTATION_ACADEMIC.value: "학술 발표",
+    SpeechSituation.FREE_SPEECH.value: "자유 스피치",
+    SpeechSituation.PITCH.value: "투자 피칭",
+    SpeechSituation.TOAST.value: "축사/스피치",
+}
+
+
+# ============================================
+# 도구 함수
+# ============================================
+
+def classify_situation(
+    user_context: str,
+    ltm_goal: Optional[str] = None,
+    transcript_preview: Optional[str] = None,
+) -> Dict:
+    """
+    Tool 1: 상황 분류
+    
+    사용자 컨텍스트에서 스피치 상황을 분류합니다.
+    
+    Args:
+        user_context: 사용자가 입력한 상황 설명 또는 질문
+        ltm_goal: Long-term Memory에서 가져온 목표 정보
+        transcript_preview: 스피치 내용 처음 200자
+    
+    Returns:
+        Dict: 분류된 상황 컨텍스트
+            - situation_type: 상황 타입
+            - confidence: 신뢰도 (0-1)
+            - reasoning: 분류 근거
+            - detected_keywords: 감지된 키워드
+    """
+    
+    context_lower = (user_context or "").lower()
+    ltm_lower = (ltm_goal or "").lower()
+    transcript_lower = (transcript_preview or "").lower()
+    
+    combined = f"{context_lower} {ltm_lower} {transcript_lower}"
+    
+    # 키워드 기반 분류
+    keywords_detected = []
+    
+    # 면접 관련 키워드
+    interview_keywords = ["면접", "인터뷰", "interview", "채용", "지원", "합격", "이력서"]
+    tech_keywords = ["기술", "코딩", "개발", "technical", "알고리즘", "시스템", "설계", "아키텍처"]
+    behavioral_keywords = ["인성", "컬처핏", "팀워크", "협업", "갈등", "실패 경험", "성격", "가치관"]
+    
+    # 발표 관련 키워드
+    presentation_keywords = ["발표", "프레젠테이션", "presentation", "보고", "회의"]
+    business_keywords = ["사업", "비즈니스", "매출", "성과", "전략", "마케팅", "영업"]
+    academic_keywords = ["논문", "연구", "학회", "학술", "thesis", "research"]
+    
+    # 기타
+    pitch_keywords = ["투자", "피칭", "pitch", "스타트업", "vc", "사업계획", "펀딩"]
+    free_keywords = ["자유", "일반", "연습", "스피치 연습", "말하기 연습"]
+    toast_keywords = ["축사", "건배사", "인사말", "환영사", "답사"]
+    
+    # 키워드 매칭
+    is_interview = any(kw in combined for kw in interview_keywords)
+    is_tech = any(kw in combined for kw in tech_keywords)
+    is_behavioral = any(kw in combined for kw in behavioral_keywords)
+    is_presentation = any(kw in combined for kw in presentation_keywords)
+    is_business = any(kw in combined for kw in business_keywords)
+    is_academic = any(kw in combined for kw in academic_keywords)
+    is_pitch = any(kw in combined for kw in pitch_keywords)
+    is_toast = any(kw in combined for kw in toast_keywords)
+    
+    # 분류 로직
+    if is_pitch:
+        situation_type = SpeechSituation.PITCH.value
+        confidence = 0.9
+        reasoning = "투자/피칭 관련 키워드 감지"
+        
+    elif is_toast:
+        situation_type = SpeechSituation.TOAST.value
+        confidence = 0.9
+        reasoning = "축사/인사말 관련 키워드 감지"
+        
+    elif is_interview:
+        if is_tech:
+            situation_type = SpeechSituation.INTERVIEW_TECH.value
+            confidence = 0.85
+            reasoning = "기술 면접 관련 키워드 감지"
+        elif is_behavioral:
+            situation_type = SpeechSituation.INTERVIEW_BEHAVIORAL.value
+            confidence = 0.85
+            reasoning = "인성/컬처핏 면접 관련 키워드 감지"
+        else:
+            situation_type = SpeechSituation.INTERVIEW_GENERAL.value
+            confidence = 0.7
+            reasoning = "일반 면접으로 분류"
+            
+    elif is_presentation:
+        if is_academic:
+            situation_type = SpeechSituation.PRESENTATION_ACADEMIC.value
+            confidence = 0.85
+            reasoning = "학술 발표 관련 키워드 감지"
+        elif is_business:
+            situation_type = SpeechSituation.PRESENTATION_BUSINESS.value
+            confidence = 0.85
+            reasoning = "비즈니스 발표 관련 키워드 감지"
+        else:
+            situation_type = SpeechSituation.PRESENTATION_BUSINESS.value
+            confidence = 0.6
+            reasoning = "일반 발표로 분류"
+            
+    else:
+        situation_type = SpeechSituation.FREE_SPEECH.value
+        confidence = 0.5
+        reasoning = "특정 상황 키워드 없음, 자유 스피치로 분류"
+    
+    # 감지된 키워드 수집
+    all_keywords = (
+        interview_keywords + tech_keywords + behavioral_keywords +
+        presentation_keywords + business_keywords + academic_keywords +
+        pitch_keywords + toast_keywords
+    )
+    keywords_detected = [kw for kw in all_keywords if kw in combined]
+    
+    return {
+        "situation_type": situation_type,
+        "confidence": confidence,
+        "reasoning": reasoning,
+        "detected_keywords": keywords_detected[:5],  # 상위 5개만
+    }
+
+
+def get_priority_weights(
+    situation_type: str,
+    user_weakness: Optional[List[str]] = None,
+) -> List[Dict]:
+    """
+    Tool 2: 우선순위 가중치 계산
+    
+    상황에 맞는 카테고리별 가중치를 반환합니다.
+    사용자의 기존 약점이 있으면 해당 카테고리 가중치를 조정합니다.
+    
+    Args:
+        situation_type: 상황 타입 (SpeechSituation 값)
+        user_weakness: 사용자의 기존 약점 카테고리 (STM에서)
+    
+    Returns:
+        List[Dict]: 카테고리별 가중치 리스트 (우선순위 순)
+            - category: 카테고리 ID
+            - weight: 가중치 (0.7-1.6)
+            - priority_rank: 우선순위 (1이 최우선)
+            - reason: 가중치 이유
+    """
+    
+    # 기본 가중치 가져오기
+    base_weights = DEFAULT_WEIGHTS.get(
+        situation_type,
+        DEFAULT_WEIGHTS[SpeechSituation.FREE_SPEECH.value]
+    )
+    
+    # 사용자 약점에 따른 조정
+    adjusted_weights = dict(base_weights)
+    
+    if user_weakness:
+        for weakness in user_weakness:
+            if weakness in adjusted_weights:
+                # 약점 카테고리 가중치 +0.2 (더 집중 필요)
+                adjusted_weights[weakness] = min(adjusted_weights[weakness] + 0.2, 1.6)
+    
+    # 가중치 → CategoryWeight 변환 및 정렬
+    category_reasons = {
+        SpeechCategory.DELIVERY.value: "명확한 전달과 청취 편의성",
+        SpeechCategory.STRUCTURE.value: "논리적이고 체계적인 구조",
+        SpeechCategory.CONTENT.value: "구체적인 내용과 사례",
+        SpeechCategory.PERSUASION.value: "설득력 있는 어조와 태도",
+    }
+    
+    result = []
+    for category, weight in adjusted_weights.items():
+        reason = category_reasons.get(category, "")
+        
+        # 약점이면 추가 설명
+        if user_weakness and category in user_weakness:
+            reason = f"[집중 필요] {reason}"
+        
+        result.append({
+            "category": category,
+            "weight": weight,
+            "priority_rank": 0,  # 나중에 설정
+            "reason": reason,
+        })
+    
+    # 가중치 기준 내림차순 정렬
+    result.sort(key=lambda x: x["weight"], reverse=True)
+    
+    # 우선순위 번호 부여
+    for i, item in enumerate(result):
+        item["priority_rank"] = i + 1
+    
+    return result
+
+
+def build_priority_ranking_result(
+    situation: Dict,
+    weights: List[Dict],
+) -> Dict:
+    """
+    Tool 3: 최종 우선순위 랭킹 결과 생성
+    
+    상황과 가중치를 종합하여 사용자에게 전달할 메시지를 생성합니다.
+    
+    Returns:
+        Dict:
+            - situation: 상황 컨텍스트
+            - weights: 카테고리별 가중치
+            - focus_message: 집중 포인트 메시지
+    """
+    
+    # 상위 2개 카테고리
+    top_categories = [CATEGORY_LABELS.get(w["category"], w["category"]) for w in weights[:2]]
+    situation_label = SITUATION_LABELS.get(situation["situation_type"], "스피치")
+    
+    focus_message = (
+        f"{situation_label} 준비에서는 **{top_categories[0]}**과 "
+        f"**{top_categories[1]}**이 가장 중요합니다."
+    )
+    
+    return {
+        "situation": situation,
+        "weights": weights,
+        "focus_message": focus_message,
+    }
+
+
+def calculate_weighted_scores(
+    raw_scores: Dict[str, float],
+    weights: List[Dict],
+) -> Dict:
+    """
+    Tool 4: 가중치 적용 점수 계산
+    
+    Args:
+        raw_scores: 원본 점수 {category: score}
+        weights: 카테고리별 가중치 리스트
+    
+    Returns:
+        Dict:
+            - weighted_scores: 카테고리별 가중치 적용 점수
+            - total_score: 가중 평균 종합 점수
+            - priority_order: 우선순위 순서
+    """
+    
+    weight_map = {w["category"]: w["weight"] for w in weights}
+    
+    weighted_scores = {}
+    total_weighted = 0
+    total_weight = 0
+    
+    for category, score in raw_scores.items():
+        weight = weight_map.get(category, 1.0)
+        weighted_scores[category] = {
+            "raw_score": score,
+            "weight": weight,
+            "weighted_score": round(score * weight, 1),
+            "label": CATEGORY_LABELS.get(category, category),
+        }
+        total_weighted += score * weight
+        total_weight += weight
+    
+    total_score = round(total_weighted / total_weight, 1) if total_weight > 0 else 0
+    
+    # 우선순위별 정렬 (가중치 높은 순)
+    priority_order = [w["category"] for w in weights]
+    
+    return {
+        "weighted_scores": weighted_scores,
+        "total_score": total_score,
+        "priority_order": priority_order,
+    }
+
+
+def get_improvement_priority(
+    category_scores: Dict[str, Dict],
+    weights: List[Dict],
+    max_items: int = 3,
+) -> List[Dict]:
+    """
+    Tool 5: 개선 우선순위 결정
+    
+    가중치와 점수를 고려하여 어떤 카테고리를 먼저 개선해야 하는지 결정합니다.
+    
+    우선순위 공식: (100 - raw_score) * weight * priority_factor
+    
+    Args:
+        category_scores: 카테고리별 점수
+        weights: 카테고리별 가중치
+        max_items: 반환할 최대 개선 포인트 수
+    
+    Returns:
+        List[Dict]: 개선 우선순위 리스트
+            - category: 카테고리
+            - current_score: 현재 점수
+            - improvement_potential: 개선 여지
+            - expected_gain: 개선 시 예상 점수 상승
+            - priority_reason: 우선순위 이유
+    """
+    
+    weight_map = {w["category"]: w for w in weights}
+    
+    improvement_items = []
+    
+    for category, score_data in category_scores.items():
+        raw_score = score_data.get("raw_score", 70)
+        weight_info = weight_map.get(category, {"weight": 1.0, "priority_rank": 99})
+        
+        weight = weight_info["weight"]
+        rank = weight_info["priority_rank"]
+        
+        # 개선 여지 계산
+        improvement_potential = 100 - raw_score
+        
+        # 우선순위 점수 (낮을수록 먼저 개선)
+        # 점수가 낮고, 가중치가 높고, 우선순위가 높을수록 먼저 개선
+        priority_score = (100 - raw_score) * weight * (1 + (4 - rank) * 0.1)
+        
+        # 예상 점수 상승 (15점 개선 가정)
+        expected_gain = round(min(15, improvement_potential) * weight, 1)
+        
+        # 이유 생성
+        reasons = []
+        if rank <= 2:
+            reasons.append("핵심 카테고리")
+        if raw_score < 60:
+            reasons.append("점수 낮음")
+        elif raw_score < 75:
+            reasons.append("개선 여지 있음")
+        if weight >= 1.3:
+            reasons.append("가중치 높음")
+        
+        improvement_items.append({
+            "category": category,
+            "label": CATEGORY_LABELS.get(category, category),
+            "current_score": raw_score,
+            "improvement_potential": improvement_potential,
+            "expected_gain": expected_gain,
+            "priority_score": priority_score,
+            "priority_reason": ", ".join(reasons) if reasons else "일반 개선",
+        })
+    
+    # 우선순위 점수 기준 정렬
+    improvement_items.sort(key=lambda x: x["priority_score"], reverse=True)
+    
+    return improvement_items[:max_items]
+
+
+# ============================================
+# ReAct 도구 정의 (Claude Tools 형식)
+# ============================================
+
+PRIORITY_TOOLS_DEFINITION = [
+    {
+        "name": "classify_situation",
+        "description": """사용자의 스피치 상황을 분류합니다.
+        
+        분류 가능한 상황:
+        - interview_technical: 기술 면접
+        - interview_behavioral: 인성/컬처핏 면접
+        - interview_general: 일반 면접
+        - presentation_business: 비즈니스 발표
+        - presentation_academic: 학술 발표
+        - free_speech: 자유 스피치
+        - pitch: 투자 피칭
+        - toast: 축사/스피치
+        
+        사용 시점: 분석 시작 전, 사용자 상황 파악이 필요할 때""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "user_context": {
+                    "type": "string",
+                    "description": "사용자가 입력한 상황 설명 또는 질문"
+                },
+                "ltm_goal": {
+                    "type": "string",
+                    "description": "Long-term Memory에서 가져온 목표 정보"
+                },
+                "transcript_preview": {
+                    "type": "string",
+                    "description": "스피치 내용 처음 200자"
+                }
+            },
+            "required": ["user_context"]
+        }
+    },
+    {
+        "name": "get_priority_weights",
+        "description": """상황에 맞는 평가 카테고리 우선순위와 가중치를 반환합니다.
+        
+        카테고리:
+        - delivery: 전달력 (말 속도, 필러워드, 발음)
+        - structure: 구조력 (논리적 흐름, STAR 구조)
+        - content: 내용력 (구체성, 숫자/성과)
+        - persuasion: 설득력 (자신감, 톤)
+        
+        가중치 범위: 0.7 ~ 1.6
+        - 1.5+: 매우 중요
+        - 1.2-1.4: 중요
+        - 1.0: 보통
+        - 0.8-0.9: 상대적으로 덜 중요
+        
+        사용 시점: 상황 분류 후, 분석 전에 우선순위 결정할 때""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "situation_type": {
+                    "type": "string",
+                    "description": "classify_situation에서 반환된 상황 타입"
+                },
+                "user_weakness": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "사용자의 기존 약점 카테고리 (선택)"
+                }
+            },
+            "required": ["situation_type"]
+        }
+    },
+    {
+        "name": "calculate_weighted_scores",
+        "description": """원본 점수에 가중치를 적용하여 최종 점수를 계산합니다.
+        
+        사용 시점: 4가지 카테고리 원본 점수가 계산된 후""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "raw_scores": {
+                    "type": "object",
+                    "description": "원본 점수 {category: score}"
+                },
+                "weights": {
+                    "type": "array",
+                    "description": "get_priority_weights에서 반환된 가중치 배열"
+                }
+            },
+            "required": ["raw_scores", "weights"]
+        }
+    },
+    {
+        "name": "get_improvement_priority",
+        "description": """개선 우선순위를 결정합니다. 어떤 카테고리를 먼저 개선해야 효과가 큰지 분석합니다.
+        
+        사용 시점: 점수 계산 후, 피드백 생성 전""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category_scores": {
+                    "type": "object",
+                    "description": "카테고리별 점수 {category: {raw_score, ...}}"
+                },
+                "weights": {
+                    "type": "array",
+                    "description": "카테고리별 가중치 배열"
+                },
+                "max_items": {
+                    "type": "integer",
+                    "description": "반환할 최대 개선 포인트 수 (기본: 3)"
+                }
+            },
+            "required": ["category_scores", "weights"]
+        }
+    }
+]
