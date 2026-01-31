@@ -11,7 +11,7 @@ import type {
 } from './nodes/progressive-context';
 
 // ============================================
-// 분석 시스템 프롬프트
+// 분석 시스템 프롬프트 (자유스피치용 - 기존 유지)
 // ============================================
 export const ANALYSIS_SYSTEM_PROMPT = `당신은 10년 경력의 스피치 코치입니다.
 
@@ -50,6 +50,108 @@ export const ANALYSIS_SYSTEM_PROMPT = `당신은 10년 경력의 스피치 코�
     }
   ],
   "structure_analysis": "STAR 구조 분석 (해당시)"
+}`;
+
+// ============================================
+// 카테고리별 상세 피드백 프롬프트 (면접/발표용)
+// ============================================
+export const CATEGORY_ANALYSIS_SYSTEM_PROMPT = `당신은 10년 경력의 스피치 코치입니다.
+사용자의 발화를 4가지 카테고리로 분석하여 구체적인 피드백을 제공합니다.
+
+## 원칙
+1. 객관적 데이터(도구 분석 결과)를 기반으로 판단합니다
+2. 각 항목별로 "Good/Warning/Bad" 중 하나로 명확히 평가합니다
+3. 추상적 조언 대신 구체적인 예시와 수치를 포함합니다
+4. 긍정적인 톤을 유지하되, 개선점은 명확히 짚어줍니다
+
+## 4가지 분석 카테고리
+
+### 1. 전달력 (Delivery) - 어떻게 말하는가
+- 속도: 도구 분석 결과의 WPM 기반 (120-170 WPM이 적정)
+- 필러워드: 도구 분석 결과 기반 (2% 이하 Good, 4% 이하 Warning, 초과 Bad)
+- 명확성: 문장이 끝까지 완결되는지, 중간에 흐지부지 끝나지 않는지
+
+### 2. 구조력 (Structure) - 논리적 흐름
+- STAR 구조: 도구 분석 결과 기반 (상황-과제-행동-결과)
+- 도입-본론-결론: 답변이 논리적 흐름을 갖추고 있는지
+- 논리적 연결: 문장 간 연결이 자연스러운지
+
+### 3. 내용력 (Content) - 무엇을 말하는가
+- 구체성: 숫자, 성과, 구체적 사례가 포함되어 있는지
+- 관련성: 질문에 대한 답변이 정확히 맞는지
+- 차별화: 일반적 답변이 아닌 본인만의 포인트가 있는지
+
+### 4. 상황 적합성 (Context Fit) - 맥락에 맞는가
+- 질문 이해도: 질문의 의도를 정확히 파악했는지
+- 핵심 키워드: 면접관이 듣고 싶은 키워드가 포함되어 있는지
+- 톤/태도: 면접/발표 상황에 적합한 어조인지
+
+## 평가 기준
+- excellent: 모든 서브 카테고리가 Good
+- good: 대부분 Good, 1개 Warning
+- average: Good과 Warning 혼합, 또는 1개 Bad
+- needs_improvement: 여러 개가 Warning 또는 Bad
+
+## 출력 형식
+반드시 아래 JSON 형식으로만 응답하세요:
+{
+  "summary": "전체 평가 한 줄 요약 (격려 + 핵심 개선점, 예: '구조는 탄탄하지만, 필러워드를 줄이면 더 자신감 있게 들릴 거예요')",
+  "categories": {
+    "delivery": {
+      "level": "excellent|good|average|needs_improvement",
+      "label": "좋음|보통|개선 필요 중 하나",
+      "highlight": "카드에 표시할 핵심 한 줄 (예: '✓ 속도 적절' 또는 '⚠️ 필러워드 주의')",
+      "subcategories": [
+        {
+          "name": "속도",
+          "status": "good|warning|bad",
+          "feedback": "구체적 피드백 (예: '145 WPM으로 적절한 속도입니다')",
+          "details": ["필요시 추가 상세 정보"]
+        },
+        {
+          "name": "필러워드",
+          "status": "good|warning|bad",
+          "feedback": "구체적 피드백",
+          "details": ["감지된 필러워드 목록 (예: '음 5회', '그러니까 3회')"]
+        },
+        {
+          "name": "명확성",
+          "status": "good|warning|bad",
+          "feedback": "구체적 피드백"
+        }
+      ]
+    },
+    "structure": {
+      "level": "...",
+      "label": "...",
+      "highlight": "...",
+      "subcategories": [
+        {"name": "STAR 구조", "status": "...", "feedback": "...", "details": ["누락된 요소가 있다면 명시"]},
+        {"name": "논리적 흐름", "status": "...", "feedback": "..."},
+        {"name": "연결성", "status": "...", "feedback": "..."}
+      ]
+    },
+    "content": {
+      "level": "...",
+      "label": "...",
+      "highlight": "...",
+      "subcategories": [
+        {"name": "구체성", "status": "...", "feedback": "...", "details": ["숫자/성과 언급 여부"]},
+        {"name": "관련성", "status": "...", "feedback": "..."},
+        {"name": "차별화", "status": "...", "feedback": "..."}
+      ]
+    },
+    "contextFit": {
+      "level": "...",
+      "label": "...",
+      "highlight": "...",
+      "subcategories": [
+        {"name": "질문 이해", "status": "...", "feedback": "..."},
+        {"name": "핵심 키워드", "status": "...", "feedback": "...", "details": ["포함된/누락된 키워드"]},
+        {"name": "톤/태도", "status": "...", "feedback": "..."}
+      ]
+    }
+  }
 }`;
 
 // ============================================
@@ -391,6 +493,112 @@ export function buildRefinementPrompt(params: RefinementPromptParams): string {
   });
 
   prompt += `\n사용자의 피드백을 반영하여 스크립트를 수정하세요.`;
+
+  return prompt;
+}
+
+// ============================================
+// 카테고리 분석 프롬프트 빌더 (면접/발표용)
+// ============================================
+
+interface CategoryAnalysisPromptParams {
+  transcript: string;
+  duration: number;
+  question?: string;
+  paceResult?: {
+    wordsPerMinute: number;
+    assessment: string;
+    recommendation: string;
+  };
+  fillerResult?: {
+    fillerCount: number;
+    fillerPercentage: number;
+    assessment: string;
+    recommendation: string;
+    mostCommonFillers?: Array<[string, number]>;
+  };
+  structureResult?: {
+    structureScore: number;
+    assessment: string;
+    recommendation: string;
+    missingElements?: string[];
+    hasNumbers?: boolean;
+  };
+  progressiveContext?: ProgressiveContext;
+}
+
+export function buildCategoryAnalysisPrompt(params: CategoryAnalysisPromptParams): string {
+  const {
+    transcript,
+    duration,
+    question,
+    paceResult,
+    fillerResult,
+    structureResult,
+    progressiveContext,
+  } = params;
+
+  let prompt = '';
+
+  // Progressive Context - Long-term Memory (사용자 배경)
+  if (progressiveContext?.longTerm) {
+    const lt = progressiveContext.longTerm;
+    prompt += `## 사용자 배경 (분석 참고용)\n`;
+
+    if (lt.company || lt.position) {
+      prompt += `**지원 정보**: ${[lt.company, lt.position].filter(Boolean).join(' - ')}\n`;
+    }
+
+    if (lt.keywords.length > 0) {
+      prompt += `**핵심 키워드 (답변에 포함되면 좋은 것들)**: ${lt.keywords.join(', ')}\n`;
+    }
+    prompt += '\n';
+  }
+
+  // 현재 질문
+  if (question) {
+    prompt += `## 질문\n${question}\n\n`;
+  }
+
+  // 원본 발화
+  prompt += `## 사용자 답변 (분석 대상)\n${transcript}\n\n`;
+  prompt += `## 발화 시간\n${duration}초\n\n`;
+
+  // 도구 분석 결과
+  prompt += `## 자동 분석 결과 (도구 기반 - 참고하여 평가에 반영)\n\n`;
+
+  if (paceResult) {
+    prompt += `### 속도 분석\n`;
+    prompt += `- WPM: ${paceResult.wordsPerMinute}\n`;
+    prompt += `- 평가: ${paceResult.assessment}\n`;
+    prompt += `- 권장: ${paceResult.recommendation}\n\n`;
+  }
+
+  if (fillerResult) {
+    prompt += `### 필러워드 분석\n`;
+    prompt += `- 개수: ${fillerResult.fillerCount}개\n`;
+    prompt += `- 비율: ${fillerResult.fillerPercentage.toFixed(1)}%\n`;
+    prompt += `- 평가: ${fillerResult.assessment}\n`;
+    if (fillerResult.mostCommonFillers && fillerResult.mostCommonFillers.length > 0) {
+      prompt += `- 자주 사용된 필러: ${fillerResult.mostCommonFillers.map(([word, count]) => `"${word}" ${count}회`).join(', ')}\n`;
+    }
+    prompt += '\n';
+  }
+
+  if (structureResult) {
+    prompt += `### STAR 구조 분석\n`;
+    prompt += `- 점수: ${structureResult.structureScore}/100\n`;
+    prompt += `- 평가: ${structureResult.assessment}\n`;
+    if (structureResult.missingElements && structureResult.missingElements.length > 0) {
+      prompt += `- 누락 요소: ${structureResult.missingElements.join(', ')}\n`;
+    }
+    if (structureResult.hasNumbers !== undefined) {
+      prompt += `- 숫자/성과 포함: ${structureResult.hasNumbers ? '예' : '아니오'}\n`;
+    }
+    prompt += '\n';
+  }
+
+  prompt += `위 도구 분석 결과와 원본 텍스트를 종합하여 4가지 카테고리로 상세 분석해주세요.`;
 
   return prompt;
 }

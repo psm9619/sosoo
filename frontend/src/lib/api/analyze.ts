@@ -32,19 +32,33 @@ export interface AnalyzeResult {
 
 /**
  * 오디오 파일을 Supabase Storage에 업로드하고 URL 반환
+ * Data URL로 변환하여 반환 (MIME 타입 보존)
  */
 async function uploadAudio(audioBlob: Blob): Promise<string> {
-  const formData = new FormData();
-  const filename = `recording-${Date.now()}.webm`;
-  formData.append('file', audioBlob, filename);
+  console.log('[uploadAudio] Input blob:', {
+    type: audioBlob.type,
+    size: audioBlob.size,
+    sizeKB: (audioBlob.size / 1024).toFixed(2) + ' KB',
+  });
 
-  // 임시로 Data URL 사용 (실제로는 Supabase Storage 사용)
-  // TODO: Supabase Storage 연동
-  return new Promise((resolve) => {
+  // Data URL로 변환 (MIME 타입이 자동으로 포함됨)
+  // 형식: data:audio/mp4;base64,... 또는 data:audio/webm;base64,...
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      resolve(reader.result as string);
+      if (reader.result) {
+        const dataUrl = reader.result as string;
+        const mimeMatch = dataUrl.match(/^data:([^;,]+)/);
+        console.log('[uploadAudio] Created data URL:', {
+          mime: mimeMatch?.[1] || 'unknown',
+          urlLength: dataUrl.length,
+        });
+        resolve(dataUrl);
+      } else {
+        reject(new Error('Failed to read audio file'));
+      }
     };
+    reader.onerror = () => reject(new Error('Failed to read audio file'));
     reader.readAsDataURL(audioBlob);
   });
 }
@@ -84,8 +98,36 @@ export async function analyzeAudio(
       }),
     })
       .then(async (response) => {
+        console.log('[analyzeAudio] Response status:', response.status);
+        console.log('[analyzeAudio] Response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
-          const errorData = await response.json();
+          let errorText = '';
+          try {
+            errorText = await response.text();
+          } catch (textErr) {
+            console.error('[analyzeAudio] Failed to read error text:', textErr);
+            errorText = '';
+          }
+          console.error('[analyzeAudio] Error response:', errorText);
+
+          // HTML 응답인 경우 (Vercel 에러 페이지 등)
+          if (errorText.startsWith('<!') || errorText.startsWith('<html')) {
+            const error = {
+              code: 'SERVER_ERROR',
+              message: `서버 오류가 발생했습니다 (${response.status}). 잠시 후 다시 시도해주세요.`,
+            };
+            onError?.(error);
+            reject(new Error(error.message));
+            return;
+          }
+
+          let errorData;
+          try {
+            errorData = errorText ? JSON.parse(errorText) : {};
+          } catch {
+            errorData = { error: { message: errorText || '분석 요청에 실패했습니다.' } };
+          }
           const error = {
             code: errorData.error?.code || 'API_ERROR',
             message: errorData.error?.message || '분석 요청에 실패했습니다.',
@@ -147,6 +189,7 @@ export async function analyzeAudio(
                   onComplete?.(result);
                   resolve(result);
                 } else if (eventType === 'error') {
+                  console.error('[analyzeAudio] SSE error event:', data);
                   const error = {
                     code: data.code || 'UNKNOWN_ERROR',
                     message: data.message || '알 수 없는 오류가 발생했습니다.',
