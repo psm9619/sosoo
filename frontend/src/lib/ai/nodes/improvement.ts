@@ -5,6 +5,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { SpeechCoachState, RefinementState } from '../state';
+import type { LongTermMemory } from './progressive-context';
 import { IMPROVEMENT_SYSTEM_PROMPT, REFLECTION_SYSTEM_PROMPT, REFINEMENT_SYSTEM_PROMPT, buildImprovementPrompt, buildRefinementPrompt } from '../prompts';
 
 // Lazy-loaded Anthropic client
@@ -26,7 +27,8 @@ function getAnthropic(): Anthropic {
 export async function generateImprovedScript(
   transcript: string,
   suggestions: Array<{ category: string; suggestion: string }>,
-  question?: string
+  question?: string,
+  longTermContext?: LongTermMemory | null
 ): Promise<string> {
   // 최소 단어 수 체크 (너무 짧은 답변 거부)
   const wordCount = transcript.trim().split(/\s+/).length;
@@ -38,6 +40,7 @@ export async function generateImprovedScript(
     transcript,
     suggestions,
     question,
+    longTermContext,
   });
 
   const response = await getAnthropic().messages.create({
@@ -184,10 +187,22 @@ export async function improvementNode(state: SpeechCoachState): Promise<Partial<
       suggestion: s.suggestion,
     }));
 
+    // Long-term context (레주메/발표자료에서 추출한 배경 정보) 전달
+    const longTermContext = state.progressiveContext?.longTerm || null;
+
+    console.log('[improvement] Using long-term context:', {
+      hasContext: !!longTermContext,
+      company: longTermContext?.company,
+      position: longTermContext?.position,
+      keywordsCount: longTermContext?.keywords?.length || 0,
+      experiencesCount: longTermContext?.experiences?.length || 0,
+    });
+
     const improvedScriptDraft = await generateImprovedScript(
       state.transcript,
       suggestions,
-      state.question
+      state.question,
+      longTermContext
     );
 
     return {
