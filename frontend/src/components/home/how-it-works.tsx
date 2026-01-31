@@ -6,7 +6,7 @@ const steps = [
   {
     number: '01',
     title: '녹음하기',
-    description: '발표, 자기소개, 영상 대본 등 개선하고 싶은 발화를 녹음하세요.',
+    description: '발표, 자기소개 등 개선하고 싶은 발화를 녹음하세요.',
     icon: (
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-teal">
         <path
@@ -52,8 +52,8 @@ const steps = [
   },
   {
     number: '03',
-    title: '개선된 버전 받기',
-    description: '더 명확하고 자신감 있는 발화를 음성으로 들어보고 연습하세요.',
+    title: '내 목소리로 듣기',
+    description: '개선된 발화를 나와 같은 목소리로 들어보며 연습하세요.',
     icon: (
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-teal">
         <path
@@ -67,12 +67,13 @@ const steps = [
         <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="2" />
       </svg>
     ),
+    note: '음성 데이터는 암호화 저장되며, 언제든 삭제할 수 있어요.',
   },
 ];
 
 export function HowItWorks() {
   return (
-    <section className="py-24 px-6 bg-warm-white">
+    <section className="py-24 px-6 bg-teal-light/40">
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
         <div className="text-center mb-16">
@@ -109,6 +110,16 @@ export function HowItWorks() {
               <p className="text-gray-warm leading-relaxed">
                 {step.description}
               </p>
+
+              {/* Security Note */}
+              {'note' in step && step.note && (
+                <p className="mt-4 text-xs text-teal flex items-center gap-1">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                  {step.note}
+                </p>
+              )}
 
               {/* Connector line (except last) */}
               {index < steps.length - 1 && (

@@ -38,7 +38,7 @@ export function Header() {
               />
             </svg>
           </div>
-          <span className="font-semibold text-lg text-charcoal">
+          <span className="font-logo font-semibold text-lg text-charcoal">
             Voice<span className="text-teal">Up</span>
           </span>
         </Link>

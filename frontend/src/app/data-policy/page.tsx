@@ -119,23 +119,57 @@ export default function DataPolicyPage() {
               </div>
             </section>
 
-            {/* AI Learning */}
+            {/* Voice Cloning Security */}
             <section className="mb-12">
-              <h2 className="text-xl font-semibold text-charcoal mb-6">AI 학습 활용</h2>
-              <Card className="p-6 bg-warm-white border-none">
-                <p className="text-gray-warm leading-relaxed mb-4">
-                  이용자의 음성 데이터는 <strong>별도 동의 없이 AI 학습에 사용되지 않습니다.</strong>
+              <h2 className="text-xl font-semibold text-charcoal mb-6 flex items-center gap-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-coral">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                보이스 클로닝 보안
+              </h2>
+              <Card className="p-6 bg-coral-light/20 border border-coral/20 mb-4">
+                <p className="text-charcoal font-medium mb-4">
+                  VoiceUp은 ElevenLabs의 보이스 클로닝 기술을 사용하며, 다음과 같은 보안 정책을 적용합니다.
                 </p>
-                <p className="text-gray-warm leading-relaxed mb-4">
-                  마이페이지 설정에서 "AI 학습 동의"를 활성화한 경우에만, 익명화된 형태로 서비스 품질 개선을 위한 AI 모델 학습에 활용될 수 있습니다.
-                </p>
-                <div className="p-4 bg-secondary/50 rounded-lg">
-                  <p className="text-sm text-gray-warm">
-                    <strong>익명화 처리:</strong> AI 학습에 활용되는 데이터는 개인을 식별할 수 없도록 처리됩니다.
-                    이메일, IP 주소 등 식별 정보는 제거되며, 음성의 고유한 특성(음색, 억양 등)도 변환 처리됩니다.
-                  </p>
-                </div>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3 text-gray-warm">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal flex-shrink-0 mt-0.5">
+                      <polyline points="20,6 9,17 4,12" />
+                    </svg>
+                    <span><strong className="text-charcoal">본인 인증 필수:</strong> 보이스 클로닝 기능은 회원가입 및 본인 인증을 완료한 사용자만 이용 가능합니다.</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-gray-warm">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal flex-shrink-0 mt-0.5">
+                      <polyline points="20,6 9,17 4,12" />
+                    </svg>
+                    <span><strong className="text-charcoal">암호화 저장:</strong> 음성 데이터는 업로드 시 암호화되어 안전하게 저장됩니다.</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-gray-warm">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal flex-shrink-0 mt-0.5">
+                      <polyline points="20,6 9,17 4,12" />
+                    </svg>
+                    <span><strong className="text-charcoal">AI 학습 미사용:</strong> 이용자의 음성 데이터는 AI 모델 학습에 절대 사용되지 않습니다.</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-gray-warm">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal flex-shrink-0 mt-0.5">
+                      <polyline points="20,6 9,17 4,12" />
+                    </svg>
+                    <span><strong className="text-charcoal">즉시 삭제 가능:</strong> 마이페이지에서 언제든 음성 모델과 관련 데이터를 완전히 삭제할 수 있습니다.</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-gray-warm">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal flex-shrink-0 mt-0.5">
+                      <polyline points="20,6 9,17 4,12" />
+                    </svg>
+                    <span><strong className="text-charcoal">제3자 공유 금지:</strong> 음성 데이터는 제3자와 절대 공유되지 않습니다.</span>
+                  </li>
+                </ul>
               </Card>
+              <div className="p-4 bg-teal-light/30 rounded-lg border border-teal/20">
+                <p className="text-sm text-teal-dark">
+                  <strong>🔒 ElevenLabs 보안 인증:</strong> VoiceUp이 사용하는 ElevenLabs는 EU AI Act를 준수하며,
+                  SOC 2 Type II 인증을 받은 안전한 음성 합성 플랫폼입니다.
+                </p>
+              </div>
             </section>
 
             {/* Data Security */}
@@ -201,7 +235,7 @@ export default function DataPolicyPage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="w-6 h-6 rounded-full bg-teal text-white text-sm flex items-center justify-center flex-shrink-0">4</span>
-                    <span><strong>동의 철회:</strong> AI 학습 동의를 언제든 철회 가능</span>
+                    <span><strong>음성 모델 삭제:</strong> 보이스 클로닝 음성 모델을 언제든 삭제 가능</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="w-6 h-6 rounded-full bg-teal text-white text-sm flex items-center justify-center flex-shrink-0">5</span>

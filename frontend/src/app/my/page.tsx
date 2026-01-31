@@ -5,56 +5,23 @@ import Link from 'next/link';
 import { Header, Footer } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-
-// Mock data for projects
-const mockProjects = [
-  {
-    id: '1',
-    title: '스타트업 피칭 발표',
-    createdAt: '2025-01-30T10:30:00',
-    duration: 45,
-    status: 'complete' as const,
-    improvements: ['추임새 제거', '문장 구조화'],
-  },
-  {
-    id: '2',
-    title: '면접 자기소개',
-    createdAt: '2025-01-29T14:20:00',
-    duration: 32,
-    status: 'complete' as const,
-    improvements: ['어순 정리', '전문성 강조'],
-  },
-  {
-    id: '3',
-    title: '유튜브 인트로',
-    createdAt: '2025-01-28T09:15:00',
-    duration: 18,
-    status: 'complete' as const,
-    improvements: ['간결화', '시청자 기대감'],
-  },
-];
+import { useProjectStore } from '@/lib/stores/project-store';
 
 type TabType = 'projects' | 'settings';
 
 export default function MyPage() {
   const [activeTab, setActiveTab] = useState<TabType>('projects');
-  const [consentAI, setConsentAI] = useState(false);
+
+  const { projects, deleteProject } = useProjectStore();
 
   // Format date to Korean style
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('ko-KR', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric',
     }).format(date);
-  };
-
-  // Format duration
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -110,9 +77,9 @@ export default function MyPage() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-semibold text-charcoal">
-                    총 {mockProjects.length}개의 프로젝트
+                    총 {projects.length}개의 프로젝트
                   </h2>
-                  <Link href="/studio">
+                  <Link href="/studio/new?type=interview">
                     <Button className="bg-teal hover:bg-teal-dark">
                       새 프로젝트
                     </Button>
@@ -120,57 +87,143 @@ export default function MyPage() {
                 </div>
 
                 {/* Projects List */}
-                {mockProjects.length > 0 ? (
+                {projects.length > 0 ? (
                   <div className="space-y-4">
-                    {mockProjects.map((project) => (
-                      <Card
-                        key={project.id}
-                        className="p-6 bg-warm-white border-none hover:shadow-md transition-shadow"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="font-semibold text-charcoal">
-                                {project.title}
-                              </h3>
-                              <span className="px-2 py-0.5 bg-teal-light/50 text-teal-dark text-xs rounded-full">
-                                완료
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-warm mb-3">
-                              {formatDate(project.createdAt)} · {formatDuration(project.duration)}
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {project.improvements.map((improvement, i) => (
-                                <span
-                                  key={i}
-                                  className="px-2 py-1 bg-secondary text-gray-warm text-xs rounded"
-                                >
-                                  {improvement}
+                    {projects.map((project) => {
+                      const totalAttempts = project.questions.reduce(
+                        (acc, q) => acc + q.attempts.length,
+                        0
+                      );
+                      const questionsWithAttempts = project.questions.filter(
+                        (q) => q.attempts.length > 0
+                      ).length;
+                      const isInterview = project.type === 'interview';
+
+                      return (
+                        <Card
+                          key={project.id}
+                          className="p-6 bg-warm-white border-none hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                              <div
+                                className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                  isInterview
+                                    ? 'bg-teal-light/50'
+                                    : project.type === 'presentation'
+                                    ? 'bg-coral-light/50'
+                                    : 'bg-secondary'
+                                }`}
+                              >
+                                <span className="text-xl">
+                                  {isInterview
+                                    ? '💼'
+                                    : project.type === 'presentation'
+                                    ? '🎤'
+                                    : '🎙️'}
                                 </span>
-                              ))}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h3 className="font-semibold text-charcoal">
+                                    {project.title}
+                                  </h3>
+                                  <span
+                                    className={`px-2 py-0.5 text-xs rounded-full ${
+                                      isInterview
+                                        ? 'bg-teal-light/50 text-teal-dark'
+                                        : project.type === 'presentation'
+                                        ? 'bg-coral-light/50 text-coral'
+                                        : 'bg-secondary text-gray-warm'
+                                    }`}
+                                  >
+                                    {isInterview
+                                      ? '면접'
+                                      : project.type === 'presentation'
+                                      ? '발표'
+                                      : '자유'}
+                                  </span>
+                                </div>
+                                {project.company && (
+                                  <p className="text-sm text-gray-warm mb-2">
+                                    {project.company} · {project.position}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-4 text-sm text-gray-warm">
+                                  <span>질문 {project.questions.length}개</span>
+                                  <span>·</span>
+                                  <span>연습 {totalAttempts}회</span>
+                                  <span>·</span>
+                                  <span>
+                                    진행률 {questionsWithAttempts}/{project.questions.length}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-soft mt-2">
+                                  {formatDate(project.updatedAt)} 업데이트
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Link href={`/my/projects/${project.id}`}>
+                                <Button variant="outline" size="sm">
+                                  기록 보기
+                                </Button>
+                              </Link>
+                              <Link href={`/studio/${project.id}`}>
+                                <Button
+                                  size="sm"
+                                  className="bg-teal hover:bg-teal-dark"
+                                >
+                                  연습하기
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-gray-soft hover:text-destructive"
+                                onClick={() => {
+                                  if (confirm('정말 삭제하시겠어요?')) {
+                                    deleteProject(project.id);
+                                  }
+                                }}
+                              >
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                </svg>
+                              </Button>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm">
-                              보기
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-gray-soft hover:text-destructive">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                              </svg>
-                            </Button>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
+                        </Card>
+                      );
+                    })}
                   </div>
                 ) : (
                   <Card className="p-12 bg-warm-white border-none text-center">
                     <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-secondary flex items-center justify-center">
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-gray-soft">
-                        <path d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z" stroke="currentColor" strokeWidth="2" />
-                        <path d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z" stroke="currentColor" strokeWidth="2" />
+                      <svg
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        className="text-gray-soft"
+                      >
+                        <path
+                          d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        />
+                        <path
+                          d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        />
                       </svg>
                     </div>
                     <h3 className="text-lg font-semibold text-charcoal mb-2">
@@ -180,9 +233,7 @@ export default function MyPage() {
                       첫 번째 발화 코칭을 시작해보세요!
                     </p>
                     <Link href="/studio">
-                      <Button className="bg-coral hover:bg-coral/90">
-                        시작하기
-                      </Button>
+                      <Button className="bg-coral hover:bg-coral/90">시작하기</Button>
                     </Link>
                   </Card>
                 )}
@@ -223,35 +274,29 @@ export default function MyPage() {
                 <Card className="p-6 bg-warm-white border-none">
                   <h3 className="font-semibold text-charcoal mb-4">데이터 설정</h3>
                   <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-4 p-4 bg-cream rounded-xl">
-                      <div>
-                        <p className="font-medium text-charcoal">AI 학습 동의</p>
-                        <p className="text-sm text-gray-warm mt-1">
-                          내 음성 데이터를 서비스 개선을 위한 AI 학습에 활용하는 것에 동의합니다.
-                        </p>
+                    <div className="p-4 bg-teal-light/30 rounded-xl border border-teal/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                        <p className="font-medium text-charcoal">보이스 클로닝 보안</p>
                       </div>
-                      <button
-                        onClick={() => setConsentAI(!consentAI)}
-                        className={`relative w-12 h-7 rounded-full transition-colors ${
-                          consentAI ? 'bg-teal' : 'bg-gray-soft/30'
-                        }`}
-                      >
-                        <span
-                          className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                            consentAI ? 'left-6' : 'left-1'
-                          }`}
-                        />
-                      </button>
+                      <p className="text-sm text-gray-warm">
+                        내 음성 데이터는 AI 학습에 사용되지 않으며, 암호화되어 안전하게 보관됩니다.
+                      </p>
                     </div>
 
-                    <div className="p-4 bg-coral-light/30 rounded-xl">
+                    <div className="p-4 bg-cream rounded-xl">
                       <p className="font-medium text-charcoal mb-2">데이터 보관 정책</p>
                       <ul className="text-sm text-gray-warm space-y-1">
                         <li>• 프로젝트 데이터는 삭제 전까지 영구 보관됩니다.</li>
                         <li>• 언제든지 개별 프로젝트를 삭제할 수 있습니다.</li>
                         <li>• 계정 삭제 시 모든 데이터가 삭제됩니다.</li>
                       </ul>
-                      <Link href="/data-policy" className="text-sm text-teal hover:text-teal-dark mt-2 inline-block">
+                      <Link
+                        href="/data-policy"
+                        className="text-sm text-teal hover:text-teal-dark mt-2 inline-block"
+                      >
                         자세한 정책 보기 →
                       </Link>
                     </div>
@@ -269,7 +314,10 @@ export default function MyPage() {
                           모든 데이터가 영구적으로 삭제됩니다.
                         </p>
                       </div>
-                      <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                      <Button
+                        variant="outline"
+                        className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                      >
                         삭제하기
                       </Button>
                     </div>
