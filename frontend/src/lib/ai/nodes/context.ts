@@ -1,25 +1,12 @@
 /**
  * 컨텍스트 분석 노드
  * 업로드된 문서(레주메, 발표자료)를 분석하여 요약 및 키워드 추출
+ *
+ * PDF: Claude API에 직접 전달 (pdf-parse 불필요)
+ * DOCX: mammoth로 텍스트 추출 (동적 import)
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-
-// PDF 파일에서 텍스트 추출 (동적 임포트로 서버리스 환경 호환)
-async function parsePdf(buffer: Buffer): Promise<{ text: string }> {
-  // pdf-parse를 동적으로 로드하여 analyze 라우트에서 불필요한 로드 방지
-  const { PDFParse } = await import('pdf-parse');
-  const pdf = new PDFParse({ data: new Uint8Array(buffer) });
-  const result = await pdf.getText();
-  return { text: result.text };
-}
-
-// DOCX 파일에서 텍스트 추출 (동적 임포트)
-async function parseDocx(buffer: Buffer): Promise<string> {
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  return result.value;
-}
 
 // Lazy-loaded Anthropic client
 let anthropicInstance: Anthropic | null = null;
@@ -38,11 +25,13 @@ function getAnthropic(): Anthropic {
 // ============================================
 
 export interface ContextAnalysisInput {
-  documentText: string;
+  documentText?: string;
   documentType: 'resume' | 'presentation' | 'other';
   projectType: 'interview' | 'presentation' | 'free_speech';
   company?: string;
   position?: string;
+  // PDF를 직접 전달하는 경우
+  pdfBase64?: string;
 }
 
 export interface Experience {
@@ -104,8 +93,14 @@ function buildContextAnalysisPrompt(input: ContextAnalysisInput): string {
     prompt += `## 지원 포지션\n${input.position}\n\n`;
   }
 
-  prompt += `## 문서 내용\n${input.documentText}\n\n`;
-  prompt += `위 문서를 분석하여 JSON 형식으로 결과를 제공하세요.`;
+  // PDF가 직접 전달된 경우
+  if (input.pdfBase64) {
+    prompt += `위 문서를 분석하여 JSON 형식으로 결과를 제공하세요.`;
+  } else if (input.documentText) {
+    // 텍스트로 전달된 경우
+    prompt += `## 문서 내용\n${input.documentText}\n\n`;
+    prompt += `위 문서를 분석하여 JSON 형식으로 결과를 제공하세요.`;
+  }
 
   return prompt;
 }
@@ -117,11 +112,31 @@ function buildContextAnalysisPrompt(input: ContextAnalysisInput): string {
 export async function analyzeContext(input: ContextAnalysisInput): Promise<ContextAnalysisResult> {
   const prompt = buildContextAnalysisPrompt(input);
 
+  // 메시지 content 배열 구성
+  const content: Anthropic.MessageCreateParams['messages'][0]['content'] = [];
+
+  // PDF가 있는 경우 document 타입으로 전달
+  if (input.pdfBase64) {
+    content.push({
+      type: 'document',
+      source: {
+        type: 'base64',
+        media_type: 'application/pdf',
+        data: input.pdfBase64,
+      },
+    });
+  }
+
+  content.push({
+    type: 'text',
+    text: prompt,
+  });
+
   const response = await getAnthropic().messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 2000,
     system: CONTEXT_ANALYSIS_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: prompt }],
+    messages: [{ role: 'user', content }],
   });
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
@@ -147,39 +162,65 @@ export async function analyzeContext(input: ContextAnalysisInput): Promise<Conte
 }
 
 // ============================================
-// 문서 텍스트 추출
+// 문서 처리 함수
 // ============================================
 
 /**
- * File 객체에서 텍스트 추출 (FormData에서 업로드된 파일용)
- * 동적 import를 사용하여 서버리스 환경 호환
+ * File 객체에서 컨텍스트 분석용 데이터 추출
+ * - PDF: base64 인코딩 (Claude API에 직접 전달)
+ * - DOCX: mammoth로 텍스트 추출 (동적 import)
+ * - TXT/MD: 텍스트로 읽기
  */
-export async function extractTextFromFile(file: File): Promise<string> {
+export async function extractDocumentData(file: File): Promise<{
+  text?: string;
+  pdfBase64?: string;
+}> {
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  // PDF 파일
+  // PDF 파일 - Claude API에 직접 전달
   if (file.type === 'application/pdf') {
-    const pdfData = await parsePdf(buffer);
-    return pdfData.text;
+    const base64 = buffer.toString('base64');
+    return { pdfBase64: base64 };
   }
 
-  // DOCX 파일
+  // DOCX 파일 - mammoth로 텍스트 추출 (동적 import로 서버리스 호환)
   if (
     file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     file.type === 'application/msword'
   ) {
-    return parseDocx(buffer);
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    return { text: result.value };
   }
 
   // 텍스트 파일
   if (file.type === 'text/plain' || file.type === 'text/markdown') {
-    return new TextDecoder().decode(buffer);
+    const text = new TextDecoder().decode(buffer);
+    return { text };
   }
 
   throw new Error(`${file.type} 파일 형식은 지원되지 않습니다. PDF, DOCX, 또는 텍스트 파일을 업로드해주세요.`);
 }
 
+/**
+ * @deprecated extractDocumentData 사용 권장
+ * 이전 호환성을 위해 유지
+ */
+export async function extractTextFromFile(file: File): Promise<string> {
+  const data = await extractDocumentData(file);
+
+  if (data.pdfBase64) {
+    return `[PDF 문서 - Claude API에서 직접 분석]`;
+  }
+
+  return data.text || '';
+}
+
+/**
+ * @deprecated
+ * URL 기반 문서 처리 (이전 호환성 유지)
+ */
 export async function extractTextFromDocument(
   fileUrl: string,
   fileType: string
@@ -194,23 +235,22 @@ export async function extractTextFromDocument(
     return response.text();
   }
 
-  // PDF 파일 처리
+  // PDF는 placeholder 반환 (새 API 사용 권장)
   if (fileType === 'application/pdf') {
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const pdfData = await parsePdf(buffer);
-    return pdfData.text;
+    return '[PDF 문서]';
   }
 
-  // DOCX 파일 처리
+  // DOCX 파일 처리 - mammoth 동적 import
   if (
     fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     fileType === 'application/msword'
   ) {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    return parseDocx(buffer);
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value;
   }
 
-  throw new Error(`${fileType} 파일 형식은 지원되지 않습니다. PDF, DOCX, 또는 텍스트 파일을 업로드해주세요.`);
+  throw new Error(`${fileType} 파일 형식은 지원되지 않습니다.`);
 }
