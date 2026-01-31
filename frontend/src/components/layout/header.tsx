@@ -11,7 +11,7 @@ const navItems = [
   { href: '/', label: '홈' },
   { href: '/about', label: '서비스 소개' },
   { href: '/examples', label: '예시' },
-  { href: '/studio', label: '스튜디오' },
+  { href: '/studio', label: '스튜디오', highlight: true },
 ];
 
 export function Header() {
@@ -65,13 +65,32 @@ export function Header() {
               key={item.href}
               href={item.href}
               className={cn(
-                'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                pathname === item.href
-                  ? 'text-teal bg-teal-light/50'
-                  : 'text-gray-warm hover:text-charcoal hover:bg-secondary'
+                'px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                item.highlight
+                  ? pathname === item.href || pathname?.startsWith('/studio')
+                    ? 'bg-gradient-to-r from-teal to-teal-dark text-white shadow-sm'
+                    : 'text-teal font-semibold hover:bg-teal-light/30 border border-teal/30'
+                  : pathname === item.href
+                    ? 'text-teal bg-teal-light/50'
+                    : 'text-gray-warm hover:text-charcoal hover:bg-secondary'
               )}
             >
-              {item.label}
+              {item.highlight && (
+                <span className="inline-flex items-center gap-1.5">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="inline">
+                    <path
+                      d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  {item.label}
+                </span>
+              )}
+              {!item.highlight && item.label}
             </Link>
           ))}
         </nav>
@@ -144,9 +163,19 @@ export function Header() {
                       </Link>
                       <Link
                         href="/studio"
-                        className="block px-4 py-2 text-sm text-charcoal hover:bg-secondary transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-teal font-medium hover:bg-teal-light/30 transition-colors"
                         onClick={() => setShowDropdown(false)}
                       >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M12 2C10.9 2 10 2.9 10 4V12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12V4C14 2.9 13.1 2 12 2Z"
+                            fill="currentColor"
+                          />
+                          <path
+                            d="M17 12C17 14.76 14.76 17 12 17C9.24 17 7 14.76 7 12H5C5 15.53 7.61 18.43 11 18.92V22H13V18.92C16.39 18.43 19 15.53 19 12H17Z"
+                            fill="currentColor"
+                          />
+                        </svg>
                         스튜디오
                       </Link>
                     </div>
