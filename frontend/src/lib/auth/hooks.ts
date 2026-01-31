@@ -89,8 +89,21 @@ export function useAuth(): AuthState & {
   }, []);
 
   const signOut = useCallback(async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Sign out error:', error);
+      }
+      // 로컬 상태 초기화
+      setUser(null);
+      setSession(null);
+    } catch (error) {
+      console.error('Sign out exception:', error);
+      // 에러가 나도 상태는 초기화
+      setUser(null);
+      setSession(null);
+    }
   }, []);
 
   return {
